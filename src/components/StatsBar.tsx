@@ -49,7 +49,7 @@ export function StatsBar() {
   const animatedVolume = useAnimatedNumber(volumeUsdc, 2)
 
   const stats = [
-    { key: 'services',   label: t.statServices,    value: '8',                                       live: false, icon: false },
+    { key: 'services',   label: t.statServices,    value: '12',                                       live: false, icon: false },
     { key: 'response',   label: t.statAvgResponse,  value: '< 200 ms',                               live: false, icon: false },
     { key: 'price',      label: t.statMinPrice,     value: '$0.001 USDC',                            live: false, icon: false },
     { key: 'calls',      label: t.statTotalCalls,   value: Math.round(animatedCalls).toLocaleString(), live: true,  icon: false },

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ConnectKitButton } from 'connectkit'
-import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X } from 'lucide-react'
+import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X, Sun, Moon } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { motion } from 'framer-motion'
 import { ServiceCard, type AgentService } from './components/ServiceCard'
@@ -224,6 +224,94 @@ const SERVICES: AgentService[] = [
     tags: ['news', 'sentiment', 'data'],
     useCases: ['Pre-trade sentiment analysis', 'Agent news briefing', 'Market event detection'],
   },
+  {
+    id: 'sentiment',
+    name: 'Sentiment Analyzer',
+    description:
+      'Runs multi-model sentiment analysis on any text — social posts, news articles, or contract descriptions — and returns a polarity score, emotion labels, and a confidence-weighted verdict.',
+    endpoint: '/pay/sentiment',
+    method: 'POST',
+    price: '0.003',
+    priceUsd: 0.003,
+    category: 'NLP',
+    responseTime: '~90 ms',
+    sla: '99.5% uptime',
+    requestSchema: {
+      text: 'string  — text to analyse (max 4 000 chars)',
+      context: 'string?  — domain hint: "crypto" | "finance" | "general"',
+    },
+    responseSchema: {
+      polarity: 'number  — –1 (negative) to +1 (positive)',
+      label: '"positive" | "neutral" | "negative"',
+      emotions: 'Record<string, number>  — e.g. { fear: 0.12, greed: 0.74 }',
+      confidence: 'number  — 0–1',
+      paid_by: 'address',
+      amount_usdc: 'string',
+    },
+    examplePayload: { text: 'Circle launches instant USDC settlement on Arc — fees near zero.', context: 'crypto' },
+    tags: ['sentiment', 'nlp', 'emotions'],
+    useCases: ['Token launch sentiment monitoring', 'Social signal scoring for trading agents', 'DAO proposal tone analysis'],
+  },
+  {
+    id: 'ens-lookup',
+    name: 'ENS / Address Resolver',
+    description:
+      'Resolves any ENS name to its current EVM address and vice-versa. Returns the primary name, avatar URL, text records, and a freshness timestamp from the latest on-chain registry state.',
+    endpoint: '/pay/ens',
+    method: 'POST',
+    price: '0.002',
+    priceUsd: 0.002,
+    category: 'Dev Tools',
+    responseTime: '~110 ms',
+    sla: '99.5% uptime',
+    requestSchema: {
+      query: 'string  — ENS name (e.g. "vitalik.eth") or 0x address',
+    },
+    responseSchema: {
+      address: 'string  — resolved EVM address',
+      name: 'string  — primary ENS name (if reverse lookup)',
+      avatar: 'string?  — avatar URL',
+      records: 'Record<string, string>  — text records (email, url, twitter…)',
+      resolved_at: 'ISO 8601 timestamp',
+      paid_by: 'address',
+      amount_usdc: 'string',
+    },
+    examplePayload: { query: 'vitalik.eth' },
+    tags: ['ens', 'identity', 'resolve'],
+    useCases: ['Display human-readable names in agent UIs', 'Verify identity before high-value transfers', 'Auto-populate recipient fields in DeFi agents'],
+  },
+  {
+    id: 'gas-estimator',
+    name: 'Gas Estimator',
+    description:
+      'Estimates the gas cost for any EVM function call before execution. Returns base fee, priority fee, and total cost in native token and USD, with a confidence interval across the last 20 blocks.',
+    endpoint: '/pay/gas',
+    method: 'POST',
+    price: '0.001',
+    priceUsd: 0.001,
+    category: 'DeFi',
+    responseTime: '~70 ms',
+    sla: '99.9% uptime',
+    requestSchema: {
+      to: 'string  — contract address',
+      data: 'string  — hex-encoded calldata',
+      chainId: 'number  — EVM chain ID',
+      value: 'string?  — msg.value in wei (default "0")',
+    },
+    responseSchema: {
+      gas_units: 'number  — estimated gas units',
+      base_fee_gwei: 'number',
+      priority_fee_gwei: 'number',
+      total_eth: 'string  — total cost in ETH / native',
+      total_usd: 'string  — USD equivalent',
+      confidence: 'number  — 0–1',
+      paid_by: 'address',
+      amount_usdc: 'string',
+    },
+    examplePayload: { to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', data: '0xa9059cbb', chainId: 1 },
+    tags: ['gas', 'evm', 'estimate'],
+    useCases: ['Pre-flight cost checks for agent transactions', 'Dynamic fee budgeting in autonomous agents', 'Alerting when gas spikes above a threshold'],
+  },
 ]
 
 const ALL_CATEGORIES = ['All', ...Array.from(new Set(SERVICES.map(s => s.category)))]
@@ -266,13 +354,27 @@ function RotatingHeroLine() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// App
+// Theme toggle
 // ─────────────────────────────────────────────────────────────
+function useTheme() {
+  const [dark, setDark] = useState(true)
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  }, [dark])
+  return { dark, toggle: () => setDark(v => !v) }
+}
+
+// Session cost context — shared across all ServiceCards
+export const SessionCostContext = React.createContext<{ add: (n: number) => void }>({ add: () => {} })
+
 export default function App() {
   const { t } = useLang()
   const [activeCategory, setActiveCategory] = useState('All')
   const [showSnippet, setShowSnippet] = useState(false)
   const [search, setSearch] = useState('')
+  const { dark, toggle: toggleTheme } = useTheme()
+  const [sessionCost, setSessionCost] = useState(0)
+  const addCost = (n: number) => setSessionCost(v => Math.round((v + n) * 10000) / 10000)
 
   const filtered = SERVICES.filter(s => {
     const matchCat = activeCategory === 'All' || s.category === activeCategory
@@ -291,7 +393,7 @@ export default function App() {
     <div className="min-h-dvh" style={{ background: 'var(--bg-gradient)' }}>
 
       {/* ── Sticky header ── */}
-      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[#0d1b2f]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] backdrop-blur-xl" style={{ background: 'var(--header-bg)' }}>
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center">
@@ -314,6 +416,21 @@ export default function App() {
               <BookOpen size={12} />
               {t.docs}
             </a>
+            {/* Session cost pill */}
+            {sessionCost > 0 && (
+              <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--success)]/15 border border-[var(--success)]/25 text-[10px] text-[var(--success)] font-medium tabular-nums">
+                <TokenUSDC variant="branded" size={10} />
+                {sessionCost.toFixed(4)} spent
+              </div>
+            )}
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] hover:border-[var(--border-strong)] transition-colors"
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {dark ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
             {/* ── Language switcher ── */}
             <LanguageSwitcher />
             <ConnectKitButton />
@@ -401,7 +518,7 @@ export default function App() {
           <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
             <div>
               <h2 className="display text-lg font-semibold text-[var(--ink)]">{t.catalogTitle}</h2>
-              <p className="text-xs text-[var(--subtle)] mt-0.5">{t.catalogSubtitle}</p>
+              <p className="text-xs text-[var(--subtle)] mt-0.5">{t.catalogSubtitle.replace('8 paid', '12 paid')}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <Filter size={11} className="text-[var(--subtle)]" />
@@ -443,6 +560,7 @@ export default function App() {
             )}
           </div>
 
+          <SessionCostContext.Provider value={{ add: addCost }}>
           <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((svc, i) => (
               <motion.div
@@ -468,6 +586,7 @@ export default function App() {
               </motion.div>
             )}
           </motion.div>
+          </SessionCostContext.Provider>
         </section>
 
         {/* ── Footer ── */}
@@ -484,6 +603,25 @@ export default function App() {
             <code className="mono text-[var(--accent)] text-[11px]">app.post("/route", gateway.require("$0.01"), handler)</code>
           </p>
           <p className="text-[10px] text-[var(--subtle)]/60 mt-1">{t.footerTestnet}</p>
+          {/* Live deployment links */}
+          <div className="flex items-center justify-center gap-4 pt-2">
+            {[
+              { label: 'GitHub', href: 'https://github.com/new-stars/agentpay' },
+              { label: 'Vercel', href: 'https://arc-studio-4347e0e2182e4e099e30c253.vercel.app' },
+              { label: 'Netlify', href: 'https://thunderous-swan-3c2126.netlify.app' },
+            ].map(l => (
+              <a
+                key={l.label}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[11px] text-[var(--subtle)] hover:text-[var(--accent)] transition-colors"
+              >
+                {l.label}
+                <ExternalLink size={10} />
+              </a>
+            ))}
+          </div>
         </footer>
       </main>
     </div>

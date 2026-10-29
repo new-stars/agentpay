@@ -1,11 +1,12 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap, CheckCircle, XCircle, Loader2, Terminal,
-  ChevronDown, ChevronUp, Code2, Lightbulb, Clock, Shield, Fuel,
+  ChevronDown, ChevronUp, Code2, Lightbulb, Clock, Shield, Fuel, Copy, Check,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
+import { SessionCostContext } from '../App'
 
 // ──────────────────────────────────────────
 // Type
@@ -82,11 +83,20 @@ function SchemaTable({ schema, title }: { schema: Record<string, string>; title:
 // ──────────────────────────────────────────
 export function ServiceCard({ service }: { service: AgentService }) {
   const { t } = useLang()
+  const { add: addSessionCost } = useContext(SessionCostContext)
   const [status, setStatus] = useState<PayStatus>('idle')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [response, setResponse] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab | null>(null)
+  const [copied, setCopied] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
+
+  const copyEndpoint = () => {
+    void navigator.clipboard.writeText(service.endpoint).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
 
   const addLog = (line: LogLine) => setLogs(prev => [...prev, line])
 
@@ -156,12 +166,14 @@ export function ServiceCard({ service }: { service: AgentService }) {
       addLog({ type: 'success', text: `   Payment queued for Circle Gateway batch` })
       addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
       setResponse(JSON.stringify(data, null, 2))
+      addSessionCost(service.priceUsd)
       setStatus('success')
     } catch {
       addLog({ type: 'server',  text: `←  HTTP 200 OK` })
       addLog({ type: 'success', text: `   Payment queued for Circle Gateway batch` })
       addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
       setResponse(JSON.stringify({ result: 'Service response delivered', settled: true, paidUsdc: service.price }, null, 2))
+      addSessionCost(service.priceUsd)
       setStatus('success')
     }
   }
@@ -226,9 +238,18 @@ export function ServiceCard({ service }: { service: AgentService }) {
             {service.method}
           </span>
           <span className="mono text-[11px] text-[var(--muted)] truncate flex-1">{service.endpoint}</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <Clock size={10} className="text-[var(--subtle)]" />
-            <span className="text-[10px] text-[var(--subtle)]">{service.responseTime}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1">
+              <Clock size={10} className="text-[var(--subtle)]" />
+              <span className="text-[10px] text-[var(--subtle)]">{service.responseTime}</span>
+            </div>
+            <button
+              onClick={copyEndpoint}
+              title="Copy endpoint"
+              className="p-0.5 rounded text-[var(--subtle)] hover:text-[var(--accent)] transition-colors"
+            >
+              {copied ? <Check size={11} className="text-[var(--success)]" /> : <Copy size={11} />}
+            </button>
           </div>
         </div>
 

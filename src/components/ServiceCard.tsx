@@ -7,6 +7,7 @@ import {
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
 import { SessionCostContext } from '../App'
+import { LiveFeedContext } from './LiveFeed'
 
 // ──────────────────────────────────────────
 // Type
@@ -84,11 +85,13 @@ function SchemaTable({ schema, title }: { schema: Record<string, string>; title:
 export function ServiceCard({ service }: { service: AgentService }) {
   const { t } = useLang()
   const { add: addSessionCost } = useContext(SessionCostContext)
+  const { push: pushFeed } = useContext(LiveFeedContext)
   const [status, setStatus] = useState<PayStatus>('idle')
   const [logs, setLogs] = useState<LogLine[]>([])
   const [response, setResponse] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab | null>(null)
   const [copied, setCopied] = useState(false)
+  const [callCount, setCallCount] = useState(0)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const copyEndpoint = () => {
@@ -167,6 +170,8 @@ export function ServiceCard({ service }: { service: AgentService }) {
       addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
       setResponse(JSON.stringify(data, null, 2))
       addSessionCost(service.priceUsd)
+      setCallCount(c => c + 1)
+      pushFeed({ service: service.name, price: service.price, agent: '0xYou…' })
       setStatus('success')
     } catch {
       addLog({ type: 'server',  text: `←  HTTP 200 OK` })
@@ -174,6 +179,8 @@ export function ServiceCard({ service }: { service: AgentService }) {
       addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
       setResponse(JSON.stringify({ result: 'Service response delivered', settled: true, paidUsdc: service.price }, null, 2))
       addSessionCost(service.priceUsd)
+      setCallCount(c => c + 1)
+      pushFeed({ service: service.name, price: service.price, agent: '0xYou…' })
       setStatus('success')
     }
   }
@@ -207,14 +214,24 @@ export function ServiceCard({ service }: { service: AgentService }) {
       {/* ── Card body ── */}
       <div className="p-5 flex-1">
 
-        {/* Category + tags */}
-        <div className="flex items-center gap-2 mb-3">
+        {/* Category + tags + call count badge */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--subtle)] px-2 py-0.5 rounded-full border border-[var(--border)]">
             {CATEGORY_ICON[service.category] ?? '●'} {service.category}
           </span>
-          {service.tags.slice(0, 2).map(t => (
-            <span key={t} className="text-[10px] text-[var(--subtle)]/70">#{t}</span>
+          {service.tags.slice(0, 2).map(tag => (
+            <span key={tag} className="text-[10px] text-[var(--subtle)]/70">#{tag}</span>
           ))}
+          {callCount > 0 && (
+            <motion.span
+              key={callCount}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1,   opacity: 1 }}
+              className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25"
+            >
+              {callCount}× called
+            </motion.span>
+          )}
         </div>
 
         {/* Name + price */}

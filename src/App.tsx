@@ -8,6 +8,7 @@ import { HowItWorks } from './components/HowItWorks'
 import { StatsBar } from './components/StatsBar'
 import { CodeSnippet } from './components/CodeSnippet'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
+import { LiveFeed } from './components/LiveFeed'
 import { useLang } from './LangContext'
 
 // ─────────────────────────────────────────────────────────────
@@ -513,6 +514,9 @@ export default function App() {
         {/* ── How it works ── */}
         <HowItWorks />
 
+        {/* ── Live feed + catalog wrapped in LiveFeedContext ── */}
+        <LiveFeed>
+
         {/* ── Service catalog ── */}
         <section>
           <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
@@ -588,6 +592,8 @@ export default function App() {
           </motion.div>
           </SessionCostContext.Provider>
         </section>
+
+        </LiveFeed>
 
         {/* ── Footer ── */}
         <footer className="mt-16 pt-8 border-t border-[var(--border)] text-center space-y-2">

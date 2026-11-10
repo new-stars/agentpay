@@ -2,6 +2,7 @@ import express from "express";
 import { createGatewayMiddleware } from "@circle-fin/x402-batching/server";
 import { formatUnits } from "viem";
 import { createRegistryRouter } from "./registry";
+import { parseUsdc } from "../src/onchain-money";
 
 // Extended request type with payment info injected by middleware
 type PaidRequest = express.Request & {
@@ -42,12 +43,36 @@ const gateway = createGatewayMiddleware({
   facilitatorUrl: FACILITATOR_URL,
 });
 
+// Demo mode lets the website show the full flow without a funded wallet: a request that carries
+// "X-Demo-Mode: simulate" gets clearly-marked SAMPLE data and no payment is taken. Every other
+// request must carry a real payment. Set DEMO_MODE=off before putting anything of value behind a route.
+const DEMO_MODE = process.env.DEMO_MODE !== "off";
+
+function gate(price: string): express.RequestHandler {
+  const real = gateway.require(price) as express.RequestHandler;
+  return (req, res, next) => {
+    if (DEMO_MODE && req.get("x-demo-mode") === "simulate") {
+      (req as PaidRequest).payment = {
+        verified: false,
+        payer: "simulated",
+        amount: parseUsdc(price.replace("$", "")).toString(),
+        network: "ARC-TESTNET",
+      };
+      const json = res.json.bind(res);
+      res.json = (body?: unknown) => json({ ...(body as object), sample_data: true, demo_mode: true });
+      next();
+      return;
+    }
+    return real(req, res, next);
+  };
+}
+
 // ──────────────────────────────────────────
 // Paid routes
 // ──────────────────────────────────────────
 
 // $0.001 per call — AI summary endpoint
-app.post("/pay/summarize", gateway.require("$0.001"), (req: PaidRequest, res) => {
+app.post("/pay/summarize", gate("$0.001"), (req: PaidRequest, res) => {
   const { text } = req.body as { text?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -66,7 +91,7 @@ app.post("/pay/summarize", gateway.require("$0.001"), (req: PaidRequest, res) =>
 });
 
 // $0.005 per call — AI translation endpoint
-app.post("/pay/translate", gateway.require("$0.005"), (req: PaidRequest, res) => {
+app.post("/pay/translate", gate("$0.005"), (req: PaidRequest, res) => {
   const { text, target_lang } = req.body as { text?: string; target_lang?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -82,7 +107,7 @@ app.post("/pay/translate", gateway.require("$0.005"), (req: PaidRequest, res) =>
 });
 
 // $0.010 per call — Data analysis endpoint
-app.post("/pay/analyze", gateway.require("$0.010"), (req: PaidRequest, res) => {
+app.post("/pay/analyze", gate("$0.010"), (req: PaidRequest, res) => {
   const { data } = req.body as { data?: unknown[] };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -99,7 +124,7 @@ app.post("/pay/analyze", gateway.require("$0.010"), (req: PaidRequest, res) => {
 });
 
 // $0.050 per call — Wallet risk score
-app.post("/risk", gateway.require("$0.050"), (req: PaidRequest, res) => {
+app.post("/risk", gate("$0.050"), (req: PaidRequest, res) => {
   const { address } = req.body as { address?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -116,7 +141,7 @@ app.post("/risk", gateway.require("$0.050"), (req: PaidRequest, res) => {
 });
 
 // $0.020 per call — Contract explainer
-app.post("/explain-contract", gateway.require("$0.020"), (req: PaidRequest, res) => {
+app.post("/explain-contract", gate("$0.020"), (req: PaidRequest, res) => {
   const { abi } = req.body as { abi?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -135,7 +160,7 @@ app.post("/explain-contract", gateway.require("$0.020"), (req: PaidRequest, res)
 });
 
 // $0.005 per call — Transaction decoder
-app.post("/decode-tx", gateway.require("$0.005"), (req: PaidRequest, res) => {
+app.post("/decode-tx", gate("$0.005"), (req: PaidRequest, res) => {
   const { txHash, chainId } = req.body as { txHash?: string; chainId?: number };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -155,25 +180,14 @@ app.post("/decode-tx", gateway.require("$0.005"), (req: PaidRequest, res) => {
 });
 
 // $0.001 per call — USDC price oracle (GET, manual 402 gate)
-app.get("/price", (req, res, next) => {
-  if (!req.headers["x-payment"]) {
-    res.status(402).json({
-      error: "Payment Required",
-      price: "0.001",
-      accepts: [{ network: "ARC-TESTNET", scheme: "gateway-nanopayment", priceUsdc: "0.001" }],
-      x402Version: 1,
-    });
-    return;
-  }
-  next();
-}, (_req, res) => {
+app.get("/price", gate("$0.001"), (req: PaidRequest, res) => {
   res.json({
     usdc_usd: 1.0001,
     vol_30d: 0.0004,
     volume_24h: "1.42B",
     liquidity: "142.5M",
     confidence: 0.998,
-    paid_by: "simulated",
+    paid_by: req.payment?.payer ?? "unknown",
     amount_usdc: "0.001",
     network: "ARC-TESTNET",
     timestamp: new Date().toISOString(),
@@ -181,18 +195,7 @@ app.get("/price", (req, res, next) => {
 });
 
 // $0.002 per call — Crypto news feed (GET, manual 402 gate)
-app.get("/news", (req, res, next) => {
-  if (!req.headers["x-payment"]) {
-    res.status(402).json({
-      error: "Payment Required",
-      price: "0.002",
-      accepts: [{ network: "ARC-TESTNET", scheme: "gateway-nanopayment", priceUsdc: "0.002" }],
-      x402Version: 1,
-    });
-    return;
-  }
-  next();
-}, (_req, res) => {
+app.get("/news", gate("$0.002"), (req: PaidRequest, res) => {
   res.json({
     articles: [
       { title: "Circle launches Arc Testnet stablecoin API suite", sentiment: "positive", relevance_score: 0.96, published_at: new Date().toISOString() },
@@ -200,9 +203,37 @@ app.get("/news", (req, res, next) => {
       { title: "USDC 24h volume hits record on Arc", sentiment: "neutral", relevance_score: 0.85, published_at: new Date().toISOString() },
     ],
     fetched_at: new Date().toISOString(),
-    paid_by: "simulated",
+    paid_by: req.payment?.payer ?? "unknown",
     amount_usdc: "0.002",
     network: "ARC-TESTNET",
+  });
+});
+
+// $0.003 per call: sentiment analysis (static sample output)
+app.post("/pay/sentiment", gate("$0.003"), (req: PaidRequest, res) => {
+  const { payer, amount, network } = req.payment!;
+  res.json({
+    polarity: 0.62, label: "positive", emotions: { fear: 0.12, greed: 0.74 }, confidence: 0.81,
+    sample_data: true, paid_by: payer, amount_usdc: formatUnits(BigInt(amount), 6), network,
+  });
+});
+
+// $0.002 per call: ENS resolver (static sample output)
+app.post("/pay/ens", gate("$0.002"), (req: PaidRequest, res) => {
+  const { query } = req.body as { query?: string };
+  const { payer, amount, network } = req.payment!;
+  res.json({
+    query: query ?? "", address: null, name: null, avatar: null, records: {}, resolved_at: new Date().toISOString(),
+    sample_data: true, paid_by: payer, amount_usdc: formatUnits(BigInt(amount), 6), network,
+  });
+});
+
+// $0.001 per call: gas estimator (static sample output)
+app.post("/pay/gas", gate("$0.001"), (req: PaidRequest, res) => {
+  const { payer, amount, network } = req.payment!;
+  res.json({
+    gas_units: 65000, base_fee_gwei: 12.4, priority_fee_gwei: 1.5, total_eth: "0.000904", total_usd: "n/a", confidence: 0.9,
+    sample_data: true, paid_by: payer, amount_usdc: formatUnits(BigInt(amount), 6), network,
   });
 });
 

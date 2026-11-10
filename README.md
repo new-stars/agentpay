@@ -40,6 +40,7 @@ Checks: `bun run check` (lint and typecheck).
 | `VITE_SELLER_ADDRESS` | Address that receives payments for the demo endpoints. |
 | `FACILITATOR_URL` | Circle Gateway facilitator URL. Defaults to the testnet facilitator. |
 | `PORT` | Backend port. Defaults to 3001. |
+| `DEMO_MODE` | Defaults to on: a request with the header `X-Demo-Mode: simulate` gets clearly marked sample data and no payment is taken. Set to `off` before putting anything of value behind a route. |
 | `RPC_PROXY_BASE_URL`, `RPC_PROXY_TOKEN`, `RPC_PROXY_CHAINS` | Optional. Provisioned by Arc Studio; not needed elsewhere. |
 
 The seller registry is stored in `server/data/registry.json`, which is created at runtime and not committed.

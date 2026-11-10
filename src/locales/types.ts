@@ -51,6 +51,9 @@ export interface Extra {
   traceSignedAuth: string
   traceQueued: string
   traceAuthorised: string // {price}
+  traceDemoSample: string
+  traceBackendDown: string
+  traceHttpFail: string // {status}
   // ── live feed ──
   feedTitle: string
   feedLive: string

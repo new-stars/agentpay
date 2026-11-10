@@ -138,17 +138,22 @@ export function ServiceCard({ service }: { service: AgentService }) {
         headers: { 'Content-Type': 'application/json' },
         ...(service.examplePayload ? { body: JSON.stringify(service.examplePayload) } : {}),
       })
-      const challenge = await unauth.json() as { accepts?: Array<{ network: string; priceUsdc?: string }>; price?: string }
-      addLog({ type: 'server', text: `←  HTTP ${unauth.status} Payment Required` })
+      const challenge = await unauth.json().catch(() => ({})) as { accepts?: Array<{ network: string; priceUsdc?: string }>; price?: string }
+      addLog({ type: 'server', text: `←  HTTP ${unauth.status}${unauth.status === 402 ? ' Payment Required' : ''}` })
+      if (unauth.status !== 402) {
+        addLog({ type: 'error', text: fmt(t.traceHttpFail, { status: unauth.status }) })
+        setStatus('error')
+        return
+      }
       const net = challenge.accepts?.map(a => a.network).join(', ') ?? 'ARC-TESTNET'
       addLog({ type: 'info',  text: `   ${t.traceLblPrice}: ${challenge.price ?? service.price} USDC` })
       addLog({ type: 'info',  text: `   ${t.traceLblNetwork}: ${net}` })
       addLog({ type: 'info',  text: `   ${t.traceLblScheme}: gateway-nanopayment` })
     } catch {
-      addLog({ type: 'server', text: `←  HTTP 402 Payment Required` })
-      addLog({ type: 'info',  text: `   ${t.traceLblPrice}: ${service.price} USDC` })
-      addLog({ type: 'info',  text: `   ${t.traceLblNetwork}: ARC-TESTNET` })
-      addLog({ type: 'info',  text: `   ${t.traceLblScheme}: gateway-nanopayment` })
+      // No backend (for example a static host): say so instead of inventing a server reply.
+      addLog({ type: 'error', text: t.traceBackendDown })
+      setStatus('error')
+      return
     }
 
     // ── Step 2: negotiate ──
@@ -166,36 +171,33 @@ export function ServiceCard({ service }: { service: AgentService }) {
     setStatus('paying')
     await sleep(300)
     addLog({ type: 'agent', text: `→  ${service.method} ${service.endpoint}` })
-    addLog({ type: 'info',  text: `   X-Payment: ${t.traceSignedAuth}` })
+    addLog({ type: 'info',  text: '   X-Demo-Mode: simulate' })
     await sleep(650)
 
     try {
       const paid = await fetch(`/api${service.endpoint}`, {
         method: service.method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-PAYMENT': 'simulated-gateway-nanopayment-auth',
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Demo-Mode': 'simulate' },
         ...(service.examplePayload ? { body: JSON.stringify(service.examplePayload) } : {}),
       })
-      const data = await paid.json() as Record<string, unknown>
-      addLog({ type: 'server',  text: `←  HTTP 200 OK` })
-      addLog({ type: 'success', text: `   ${t.traceQueued}` })
-      addLog({ type: 'success', text: `   ${fmt(t.traceAuthorised, { price: service.price })}` })
+      const data = await paid.json().catch(() => null) as Record<string, unknown> | null
+      addLog({ type: 'server', text: `←  HTTP ${paid.status}${paid.ok ? ' OK' : ''}` })
+      if (!paid.ok) {
+        addLog({ type: 'error', text: fmt(t.traceHttpFail, { status: paid.status }) })
+        setStatus('error')
+        return
+      }
+      addLog({ type: 'success', text: `   ${t.traceDemoSample}` })
+      addLog({ type: 'info',    text: `   ${t.traceQueued}` })
+      addLog({ type: 'info',    text: `   ${fmt(t.traceAuthorised, { price: service.price })}` })
       setResponse(JSON.stringify(data, null, 2))
       addSessionCost(service.priceUsd)
       setCallCount(c => c + 1)
       pushFeed({ service: service.id, price: service.price, agent: '@you' })
       setStatus('success')
     } catch {
-      addLog({ type: 'server',  text: `←  HTTP 200 OK` })
-      addLog({ type: 'success', text: `   ${t.traceQueued}` })
-      addLog({ type: 'success', text: `   ${fmt(t.traceAuthorised, { price: service.price })}` })
-      setResponse(JSON.stringify({ result: 'Service response delivered', settled: true, paidUsdc: service.price }, null, 2))
-      addSessionCost(service.priceUsd)
-      setCallCount(c => c + 1)
-      pushFeed({ service: service.id, price: service.price, agent: '@you' })
-      setStatus('success')
+      addLog({ type: 'error', text: t.traceBackendDown })
+      setStatus('error')
     }
   }
 

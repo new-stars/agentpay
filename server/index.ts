@@ -4,6 +4,8 @@ import { formatUnits } from "viem";
 import { createRegistryRouter } from "./registry";
 import { createPaymentsRouter, recordRoute } from "./payments";
 import { isServerless, storeKind } from "./store";
+import { rateLimit } from "./ratelimit";
+import { cors, errorHandler, notFound, securityHeaders } from "./security";
 import { parseUsdc } from "../src/onchain-money";
 
 // Extended request type with payment info injected by middleware
@@ -18,16 +20,12 @@ type PaidRequest = express.Request & {
 };
 
 const app = express();
-app.use(express.json());
-
-// Allow CORS from Vite dev server
-app.use((_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "*");
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  if (_req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
+app.disable("x-powered-by");
+app.use(securityHeaders);
+app.use(cors);
+// One visitor cannot hammer the service as a whole; stricter limits sit on the expensive routes.
+app.use(rateLimit({ name: "all", max: 300, windowMs: 60_000 }));
+app.use(express.json({ limit: "200kb" }));
 
 const SELLER_ADDRESS = process.env.VITE_SELLER_ADDRESS;
 const FACILITATOR_URL =
@@ -68,9 +66,17 @@ if (FAST_SETTLE) {
 // request must carry a real payment. Set DEMO_MODE=off before putting anything of value behind a route.
 const DEMO_MODE = process.env.DEMO_MODE !== "off";
 
+// Each paid call class has its own budget. Paying attempts reach Circle's service, so they are the tightest
+// and also capped for the whole service.
+const unpaidPerIp = rateLimit({ name: "pay-unpaid", max: 120, windowMs: 60_000 });
+const demoPerIp = rateLimit({ name: "pay-demo", max: 60, windowMs: 60_000 });
+const paidPerIp = rateLimit({ name: "pay-real", max: 60, windowMs: 60_000 });
+const paidGlobal = rateLimit({ name: "pay-real", max: 1200, windowMs: 60_000, global: true });
+
 function gate(price: string): express.RequestHandler {
   const real = gateway.require(price) as express.RequestHandler;
-  return (req, res, next) => {
+
+  const handle: express.RequestHandler = (req, res, next) => {
     if (DEMO_MODE && req.get("x-demo-mode") === "simulate") {
       (req as PaidRequest).payment = {
         verified: false,
@@ -98,13 +104,42 @@ function gate(price: string): express.RequestHandler {
         recordRoute({ id: pay.transaction, route: req.path });
       }
     });
-    // A malformed Payment-Signature is a client error: answer 400 instead of letting the gate fail with a 500.
+    real(req, res, next);
+  };
+
+  return (req, res, next) => {
+    const demo = DEMO_MODE && req.get("x-demo-mode") === "simulate";
     const sig = req.get("payment-signature");
-    if (sig !== undefined) {
+    const budget = demo ? demoPerIp : sig !== undefined ? paidPerIp : unpaidPerIp;
+    budget(req, res, () => {
+      if (sig === undefined || demo) { handle(req, res, next); return; }
+      // A malformed Payment-Signature is a client error: answer 400 and do not spend the shared budget on it.
       try { JSON.parse(Buffer.from(sig, "base64").toString("utf8")); }
-      catch { res.status(400).json({ error: "Malformed Payment-Signature header" }); return; }
+      catch { res.status(400).json({ error: "Malformed Payment-Signature header", code: "bad_signature" }); return; }
+      paidGlobal(req, res, () => handle(req, res, next));
+    });
+  };
+}
+
+/**
+ * Checks the types and sizes of the body fields a route reads, BEFORE payment is taken, so a bad request
+ * is rejected for free instead of failing after the buyer has been charged. Missing fields are fine.
+ */
+type FieldRule = ["string", number] | ["array", number] | ["number"];
+function bodyShape(rules: Record<string, FieldRule>): express.RequestHandler {
+  return (req, res, next) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof body !== "object" || Array.isArray(body)) { res.status(400).json({ error: "Body must be a JSON object", code: "bad_body" }); return; }
+    for (const [key, rule] of Object.entries(rules)) {
+      const v = body[key];
+      if (v === undefined) continue;
+      const ok =
+        rule[0] === "string" ? typeof v === "string" && v.length <= rule[1]
+        : rule[0] === "array" ? Array.isArray(v) && v.length <= rule[1] && v.every(x => typeof x === "number" && Number.isFinite(x))
+        : typeof v === "number" && Number.isFinite(v);
+      if (!ok) { res.status(400).json({ error: `Invalid field: ${key}`, code: "bad_body" }); return; }
     }
-    return real(req, res, next);
+    next();
   };
 }
 
@@ -113,7 +148,7 @@ function gate(price: string): express.RequestHandler {
 // ──────────────────────────────────────────
 
 // $0.001 per call — AI summary endpoint
-app.post("/pay/summarize", gate("$0.001"), (req: PaidRequest, res) => {
+app.post("/pay/summarize", bodyShape({ text: ["string", 16_000] }), gate("$0.001"), (req: PaidRequest, res) => {
   const { text } = req.body as { text?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -132,7 +167,7 @@ app.post("/pay/summarize", gate("$0.001"), (req: PaidRequest, res) => {
 });
 
 // $0.005 per call — AI translation endpoint
-app.post("/pay/translate", gate("$0.005"), (req: PaidRequest, res) => {
+app.post("/pay/translate", bodyShape({ text: ["string", 16_000], target_lang: ["string", 8] }), gate("$0.005"), (req: PaidRequest, res) => {
   const { text, target_lang } = req.body as { text?: string; target_lang?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -148,7 +183,7 @@ app.post("/pay/translate", gate("$0.005"), (req: PaidRequest, res) => {
 });
 
 // $0.010 per call — Data analysis endpoint
-app.post("/pay/analyze", gate("$0.010"), (req: PaidRequest, res) => {
+app.post("/pay/analyze", bodyShape({ data: ["array", 1_000] }), gate("$0.010"), (req: PaidRequest, res) => {
   const { data } = req.body as { data?: unknown[] };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -165,7 +200,7 @@ app.post("/pay/analyze", gate("$0.010"), (req: PaidRequest, res) => {
 });
 
 // $0.050 per call — Wallet risk score
-app.post("/risk", gate("$0.050"), (req: PaidRequest, res) => {
+app.post("/risk", bodyShape({ address: ["string", 64] }), gate("$0.050"), (req: PaidRequest, res) => {
   const { address } = req.body as { address?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -182,7 +217,7 @@ app.post("/risk", gate("$0.050"), (req: PaidRequest, res) => {
 });
 
 // $0.020 per call — Contract explainer
-app.post("/explain-contract", gate("$0.020"), (req: PaidRequest, res) => {
+app.post("/explain-contract", bodyShape({ abi: ["string", 150_000] }), gate("$0.020"), (req: PaidRequest, res) => {
   const { abi } = req.body as { abi?: string };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -201,7 +236,7 @@ app.post("/explain-contract", gate("$0.020"), (req: PaidRequest, res) => {
 });
 
 // $0.005 per call — Transaction decoder
-app.post("/decode-tx", gate("$0.005"), (req: PaidRequest, res) => {
+app.post("/decode-tx", bodyShape({ txHash: ["string", 80], chainId: ["number"] }), gate("$0.005"), (req: PaidRequest, res) => {
   const { txHash, chainId } = req.body as { txHash?: string; chainId?: number };
   const { payer, amount, network } = req.payment!;
   const usdcAmount = formatUnits(BigInt(amount), 6);
@@ -260,7 +295,7 @@ app.post("/pay/sentiment", gate("$0.003"), (req: PaidRequest, res) => {
 });
 
 // $0.002 per call: ENS resolver (static sample output)
-app.post("/pay/ens", gate("$0.002"), (req: PaidRequest, res) => {
+app.post("/pay/ens", bodyShape({ query: ["string", 256] }), gate("$0.002"), (req: PaidRequest, res) => {
   const { query } = req.body as { query?: string };
   const { payer, amount, network } = req.payment!;
   res.json({
@@ -324,6 +359,9 @@ app.use("/payments", createPaymentsRouter({ seller: SELLER_ADDRESS, facilitatorU
 app.get("/health", (_req, res) =>
   res.json({ status: "ok", storage: storeKind, sellerConfigured: Boolean(SELLER_ADDRESS), demoMode: DEMO_MODE }),
 );
+
+app.use(notFound);
+app.use(errorHandler);
 
 // A normal server listens on a port. A serverless host calls the exported app directly.
 if (!isServerless) {

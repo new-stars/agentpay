@@ -9,6 +9,7 @@ import { formatUsdc } from "../src/onchain-money";
 import { getChain, buildTxExplorerUrl } from "../src/onchain-facts";
 import { isTerminal, STAGES, type Receipt, type ReceiptsResponse, type TransferStatus } from "../src/receipts";
 import { loadJson, saveJson } from "./store";
+import { rateLimit } from "./ratelimit";
 
 const ALL_STATUSES: TransferStatus[] = [...STAGES, "failed"];
 const PAGE = 50;
@@ -84,7 +85,8 @@ export function createPaymentsRouter(opts: { seller?: string; facilitatorUrl: st
   const explorerChainId = Number.isInteger(chainId) && getChain(chainId) ? chainId : null;
   let cache: { at: number; body: ReceiptsResponse } | undefined;
 
-  router.get("/", async (_req, res) => {
+  // Each uncached call here makes several requests to Circle, so it is limited per visitor and overall.
+  router.get("/", rateLimit({ name: "payments", max: 60, windowMs: 60_000 }), rateLimit({ name: "payments", max: 600, windowMs: 60_000, global: true }), async (_req, res) => {
     const seller = opts.seller;
     if (!seller) {
       res.json({ seller: null, receipts: [], counts: emptyCounts(), totalUsdc: "0", medianSecondsToComplete: null, truncated: false } satisfies ReceiptsResponse);

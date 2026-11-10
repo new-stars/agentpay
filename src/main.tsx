@@ -10,6 +10,7 @@
  *  https://studio.arc.io
  */
 
+import './fonts'
 import './tracing'
 import './console-capture'
 

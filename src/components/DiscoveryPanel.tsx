@@ -38,7 +38,7 @@ export function DiscoveryPanel() {
   // The request that is currently shown. Changing it (on submit) triggers a fetch.
   const [request, setRequest] = useState({ q: '', category: '' })
   const [data, setData] = useState<DiscoveryResponse | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<'rate' | 'other' | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -49,11 +49,12 @@ export function DiscoveryPanel() {
         if (request.q) qs.set('q', request.q)
         if (request.category) qs.set('category', request.category)
         const res = await fetch(`/api/registry/discover?${qs.toString()}`)
+        if (res.status === 429) { if (!cancelled) setFailed('rate'); return }
         if (!res.ok) throw new Error('discovery')
         const json = (await res.json()) as DiscoveryResponse
-        if (!cancelled) { setData(json); setFailed(false) }
+        if (!cancelled) { setData(json); setFailed(null) }
       } catch {
-        if (!cancelled) setFailed(true)
+        if (!cancelled) setFailed('other')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -90,7 +91,7 @@ export function DiscoveryPanel() {
         </button>
       </form>
 
-      {failed && <p className="text-xs text-[var(--danger)]">{t.discError}</p>}
+      {failed && <p className="text-xs text-[var(--danger)]">{failed === 'rate' ? t.errors.rate_limited : t.discError}</p>}
       {!failed && data && data.items.length === 0 && <p className="text-xs text-[var(--muted)]">{t.discNone}</p>}
 
       {!failed && data && data.items.length > 0 && (

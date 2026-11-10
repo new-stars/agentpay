@@ -32,6 +32,19 @@ async function redis(command: string[]): Promise<unknown> {
   return ((await res.json()) as { result: unknown }).result;
 }
 
+/** Run several Redis commands in one HTTPS round trip (used for shared rate-limit counters). */
+export async function redisPipeline(commands: (string | number)[][]): Promise<unknown[]> {
+  if (storeKind !== "upstash") throw new Error("Redis is not configured");
+  const res = await fetch(`${REST_URL as string}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${REST_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify(commands),
+    signal: AbortSignal.timeout(3_000),
+  });
+  if (!res.ok) throw new Error(`Redis HTTP ${res.status}`);
+  return ((await res.json()) as Array<{ result: unknown }>).map(r => r.result);
+}
+
 export async function loadJson<T>(name: string): Promise<T | undefined> {
   if (!KEY.test(name)) throw new Error("invalid store key");
   try {

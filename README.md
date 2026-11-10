@@ -46,6 +46,10 @@ Checks: `bun run check` (lint and typecheck).
 | `PUBLIC_SITE_URL` | Public address of the deployed site. Used for the operator's own marketplace listing. Vercel and Netlify supply it automatically. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional Redis database (also accepted as `KV_REST_API_URL` and `KV_REST_API_TOKEN`). Without it, marketplace listings on a serverless host live only as long as the instance does. |
 | `PAYMENTS_NETWORK` | Network whose payments the receipts panel lists. Defaults to Arc Testnet. |
+| `ADMIN_TOKEN` | Optional, at least 16 characters. Enables `DELETE /registry/<id>` so you can remove an abusive listing. Without it that route does not exist. |
+| `RATE_LIMIT_MULTIPLIER` | Optional, 1 to 100 (default 1). Raises every rate limit at once, for a trusted or private deployment. |
+| `TRUST_PROXY_HEADER` | Optional. Name of a header your own proxy sets with the real client address. Forwarding headers are otherwise ignored, except on Vercel and Netlify. |
+| `ALLOWED_ORIGINS` | Optional, comma-separated. Extra websites allowed to change the marketplace from a browser. |
 | `PERF_LOG` | Set to any value to log how long each paid request takes on the server. |
 | `RPC_PROXY_BASE_URL`, `RPC_PROXY_TOKEN`, `RPC_PROXY_CHAINS` | Optional. Provisioned by Arc Studio; not needed elsewhere. |
 
@@ -85,3 +89,21 @@ On the host, set at least:
 Never add `AGENT_PRIVATE_KEY` or any other private key to a deployed site. It is only for the local test scripts.
 
 Payment receipts need no database: they are read from Circle by payout address, so they survive restarts and show payments made through any instance.
+
+## Security
+
+- **Abuse limits**: per visitor and for the whole service, tightest on anything that reaches Circle or an outside server (submitting a seller: 5 per hour, payment attempts: 60 per minute). Counters are shared across instances when Redis is configured.
+- **Sellers cannot lie**: a listing is accepted only if the endpoint is reachable over HTTPS, asks for payment, and names the same payout address and price that were entered. Dead or mismatched listings are never stored, and the check repeats later so a seller cannot switch the price afterwards.
+- **No server-side request tricks**: seller URLs must be public domain names on https. The address is checked at the moment of connecting, so a name that points at an internal address is refused, redirects are not followed, and replies are size and time limited.
+- **Cross-site protection**: another website cannot make a visitor's browser change the marketplace.
+- **Charged only for valid requests**: bad input is rejected before payment is taken. Payments are refused when no payout address is configured.
+- **Clean errors**: no stack traces or internal messages reach callers, and responses are never cached.
+- **Page headers**: the Vercel and Netlify configs add a content security policy, clickjacking protection and the usual hardening headers.
+- **Text from sellers** is stripped of control and direction-override characters and is always shown as plain text.
+
+Run the checks against a running backend:
+
+```
+API_BASE=http://localhost:3002 ADMIN_TOKEN=<token> bun run scripts/security-check.ts   # backend started with RATE_LIMIT_MULTIPLIER=50 and the same ADMIN_TOKEN
+LIMITS=1 bun run scripts/security-check.ts                                              # backend with default limits
+```

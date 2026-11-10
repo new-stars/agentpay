@@ -1,16 +1,34 @@
 import express from "express";
-import { promises as dns } from "node:dns";
-import { isIP } from "node:net";
+import { promises as dns, lookup as dnsLookup } from "node:dns";
+import https from "node:https";
+import { isIP, type LookupFunction } from "node:net";
 import { randomUUID } from "node:crypto";
 import { withQuote, BROKER_FEE_BPS, type Listing, type ListingStatus } from "../src/registry";
-import { formatUsdc } from "../src/onchain-money";
+import { formatUsdc, parseUsdc } from "../src/onchain-money";
 import { isServerless, loadJson, saveJson } from "./store";
+import { rateLimit } from "./ratelimit";
+import { adminOnly, sameOriginOnly } from "./security";
 
 const MAX_LISTINGS = 200;
 const CATEGORIES = ["NLP", "Data", "DeFi", "Compliance", "Dev Tools", "Other"];
 const PROBE_TIMEOUT_MS = 5_000;
 const RECHECK_MIN_INTERVAL_MS = 10_000;
 const STALE_AFTER_MS = 10 * 60_000;
+const MAX_PER_PAYOUT = 5;
+const MAX_PROBE_BYTES = 64 * 1024;
+const PROBE_DEADLINE_MS = 8_000;
+
+// Abuse limits. Per visitor unless marked global.
+const submitPerIp = rateLimit({ name: "reg-submit", max: 5, windowMs: 3_600_000 });
+const submitGlobal = rateLimit({ name: "reg-submit", max: 100, windowMs: 3_600_000, global: true });
+const checkPerIp = rateLimit({ name: "reg-check", max: 20, windowMs: 60_000 });
+const readPerIp = rateLimit({ name: "reg-read", max: 120, windowMs: 60_000 });
+const discoverPerIp = rateLimit({ name: "reg-discover", max: 30, windowMs: 60_000 });
+const discoverGlobal = rateLimit({ name: "reg-discover", max: 600, windowMs: 60_000, global: true });
+const adminPerIp = rateLimit({ name: "reg-admin", max: 10, windowMs: 60_000 });
+
+/** Remove control characters and the bidirectional overrides that can make text display as something it is not. */
+const stripUnsafe = (v: string) => v.replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, " ");
 
 // Storage (see ./store.ts: file, Redis over HTTPS, or memory)
 // ──────────────────────────────────────────
@@ -50,22 +68,133 @@ async function assertPublicHost(hostname: string) {
   }
 }
 
-async function probe(l: Listing): Promise<ListingStatus> {
+/**
+ * Resolve a name and refuse private answers at connection time. Checking once and connecting later would let
+ * a hostile DNS server answer "public" first and "10.0.0.1" second (DNS rebinding); here the address that is
+ * checked is the address that is used.
+ */
+const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, options.all ? [] : "", 0);
+      return;
+    }
+    if (addresses.length === 0 || addresses.some(a => isPrivateIp(a.address))) {
+      callback(new Error("Host resolves to a private or loopback address"), options.all ? [] : "", 0);
+      return;
+    }
+    if (options.all) callback(null, addresses);
+    else callback(null, addresses[0].address, addresses[0].family);
+  });
+};
+
+interface ProbeReply { status: number; paymentRequired?: string; body: string }
+
+/** One bounded request to a seller-supplied URL: https only, no redirects, size and time capped, public addresses only. */
+function safeRequest(url: URL, method: "GET" | "POST"): Promise<ProbeReply> {
+  return new Promise((resolve, reject) => {
+    if (url.protocol !== "https:") { reject(new Error("https only")); return; }
+    if (isIP(url.hostname) && isPrivateIp(url.hostname)) { reject(new Error("private address")); return; }
+    const payload = method === "POST" ? "{}" : undefined;
+    let done = false;
+    const finish = (fn: () => void) => { if (!done) { done = true; clearTimeout(deadline); fn(); } };
+    const req = https.request(url, {
+      method,
+      lookup: publicOnlyLookup,
+      timeout: PROBE_TIMEOUT_MS,
+      headers: {
+        accept: "application/json",
+        "user-agent": "agentpay-health/1.0",
+        ...(payload ? { "content-type": "application/json", "content-length": String(payload.length) } : {}),
+      },
+    }, res => {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      const reply = (): ProbeReply => {
+        const h = res.headers["payment-required"];
+        return {
+          status: res.statusCode ?? 0,
+          paymentRequired: Array.isArray(h) ? h[0] : h,
+          body: Buffer.concat(chunks).toString("utf8"),
+        };
+      };
+      res.on("data", (c: Buffer) => {
+        size += c.length;
+        if (size > MAX_PROBE_BYTES) { finish(() => resolve(reply())); req.destroy(); return; }
+        chunks.push(c);
+      });
+      res.on("end", () => finish(() => resolve(reply())));
+      res.on("error", e => finish(() => reject(e)));
+    });
+    const deadline = setTimeout(() => req.destroy(new Error("deadline")), PROBE_DEADLINE_MS);
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("error", e => finish(() => reject(e)));
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+/** The operator's own endpoint (may be http on localhost). Only ever used for trusted listings. */
+async function trustedRequest(url: URL, method: "GET" | "POST"): Promise<ProbeReply> {
+  const res = await fetch(url, {
+    method,
+    redirect: "manual",
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+    body: method === "POST" ? "{}" : undefined,
+  });
+  return { status: res.status, paymentRequired: res.headers.get("payment-required") ?? undefined, body: (await res.text()).slice(0, MAX_PROBE_BYTES) };
+}
+
+interface Requirement { payTo: string; amount: string }
+
+/** What the seller says it will charge: x402 v2 sends it in a header, v1 in the body. */
+function readRequirements(reply: ProbeReply): Requirement[] {
+  const out: Requirement[] = [];
+  const add = (a: unknown) => {
+    const o = (a ?? {}) as { payTo?: unknown; amount?: unknown; maxAmountRequired?: unknown };
+    const amount = typeof o.amount === "string" ? o.amount : typeof o.maxAmountRequired === "string" ? o.maxAmountRequired : undefined;
+    if (typeof o.payTo === "string" && amount && /^\d{1,30}$/.test(amount)) out.push({ payTo: o.payTo.toLowerCase(), amount });
+  };
+  const fromJson = (text: string) => {
+    try {
+      const j = JSON.parse(text) as { accepts?: unknown };
+      if (Array.isArray(j.accepts)) j.accepts.slice(0, 50).forEach(add);
+    } catch {
+      // Not JSON: no requirements found here.
+    }
+  };
+  if (reply.paymentRequired) fromJson(Buffer.from(reply.paymentRequired, "base64").toString("utf8"));
+  if (out.length === 0) fromJson(reply.body);
+  return out;
+}
+
+export type RejectReason = "unreachable" | "not_402" | "no_requirements" | "payto_mismatch" | "price_mismatch";
+
+/**
+ * A listing is healthy only if the endpoint demands payment AND asks for the payout address and price the
+ * listing advertises. Otherwise a seller could list a cheap price and charge more, or name one address and
+ * collect at another.
+ */
+async function inspect(l: Listing): Promise<{ ok: true } | { ok: false; reason: RejectReason }> {
+  let reply: ProbeReply;
   try {
     const url = new URL(l.path, l.baseUrl);
-    if (!trusted.has(l.id)) await assertPublicHost(url.hostname);
-    const res = await fetch(url, {
-      method: l.method,
-      redirect: "manual", // never follow redirects into internal hosts
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-      headers: l.method === "POST" ? { "Content-Type": "application/json" } : undefined,
-      body: l.method === "POST" ? "{}" : undefined,
-    });
-    // A paid endpoint with no payment attached must answer 402.
-    return res.status === 402 ? "healthy" : "unreachable";
+    reply = trusted.has(l.id) ? await trustedRequest(url, l.method) : await safeRequest(url, l.method);
   } catch {
-    return "unreachable";
+    return { ok: false, reason: "unreachable" };
   }
+  if (reply.status !== 402) return { ok: false, reason: "not_402" };
+  const reqs = readRequirements(reply);
+  if (reqs.length === 0) return { ok: false, reason: "no_requirements" };
+  const forUs = reqs.filter(q => q.payTo === l.payTo.toLowerCase());
+  if (forUs.length === 0) return { ok: false, reason: "payto_mismatch" };
+  if (!forUs.some(q => q.amount === parseUsdc(l.price).toString())) return { ok: false, reason: "price_mismatch" };
+  return { ok: true };
+}
+
+async function probe(l: Listing): Promise<ListingStatus> {
+  return (await inspect(l)).ok ? "healthy" : "unreachable";
 }
 
 // ──────────────────────────────────────────
@@ -77,7 +206,8 @@ interface Submission {
 }
 
 function validate(b: Submission): { ok: true; value: Omit<Listing, "id" | "status" | "lastCheckedAt" | "createdAt"> } | { ok: false; error: string; code: string } {
-  const str = (v: unknown, min: number, max: number) => typeof v === "string" && v.trim().length >= min && v.trim().length <= max;
+  const cleaned = (v: unknown) => (typeof v === "string" ? stripUnsafe(v).replace(/\s+/g, " ").trim() : "");
+  const str = (v: unknown, min: number, max: number) => typeof v === "string" && cleaned(v).length >= min && cleaned(v).length <= max;
   if (!str(b.name, 3, 60)) return { ok: false, error: "name must be 3-60 characters", code: "name" };
   if (!str(b.description, 0, 300)) return { ok: false, error: "description must be at most 300 characters", code: "description" };
   if (typeof b.category !== "string" || !CATEGORIES.includes(b.category)) return { ok: false, error: `category must be one of: ${CATEGORIES.join(", ")}`, code: "category" };
@@ -88,10 +218,13 @@ function validate(b: Submission): { ok: true; value: Omit<Listing, "id" | "statu
   let base: URL;
   try { base = new URL(String(b.baseUrl)); } catch { return { ok: false, error: "baseUrl must be a valid URL", code: "baseUrl" }; }
   if (base.protocol !== "https:" || base.port !== "" || base.username || base.password) return { ok: false, error: "baseUrl must be https on the default port, without credentials", code: "baseUrl" };
+  // A real public name: no IP literals, no single-label or internal-looking hosts.
+  const host = base.hostname;
+  if (isIP(host) || !host.includes(".") || /\.(local|localhost|internal|lan|home|corp|intranet)$/i.test(host)) return { ok: false, error: "baseUrl must be a public domain name", code: "baseUrl" };
   return {
     ok: true,
     value: {
-      name: String(b.name).trim(), description: String(b.description ?? "").trim(), category: b.category,
+      name: cleaned(b.name), description: cleaned(b.description), category: b.category,
       baseUrl: base.origin, path: b.path, method: b.method, price: b.price, payTo: b.payTo,
     },
   };
@@ -107,7 +240,7 @@ const discoveryCache = new Map<string, { at: number; body: unknown }>();
 const USDC_NAMES = new Set(["USD Coin", "USDC", "GatewayWalletBatched"]);
 
 const clean = (v: unknown, max: number) =>
-  typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max) : "";
+  typeof v === "string" ? stripUnsafe(v).trim().slice(0, max) : "";
 
 interface RawAccept { amount?: unknown; network?: unknown; extra?: { name?: unknown } }
 interface RawItem { resource?: unknown; accepts?: RawAccept[]; metadata?: { provider?: { name?: unknown; category?: unknown }; method?: unknown; description?: unknown; supportsCircleGateway?: unknown } }
@@ -191,6 +324,11 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: stri
 
   const router = express.Router();
 
+  router.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/discover")) readPerIp(req, res, next);
+    else next();
+  });
+
   router.use((req, _res, next) => {
     const work = req.path.startsWith("/discover")
       ? init()
@@ -223,7 +361,7 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: stri
     res.json({ best: candidates[0], alternatives: candidates.slice(1, 4) });
   });
 
-  router.post("/", async (req, res) => {
+  router.post("/", sameOriginOnly, submitPerIp, submitGlobal, async (req, res) => {
     if (listings.length >= MAX_LISTINGS) { res.status(429).json({ error: "Registry is full", code: "full" }); return; }
     const v = validate((req.body ?? {}) as Submission);
     if (!v.ok) { res.status(400).json({ error: v.error, code: v.code }); return; }
@@ -233,18 +371,25 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: stri
       res.status(400).json({ error: err instanceof Error ? err.message : "Host could not be verified as public", code: "private_host" });
       return;
     }
-    if (listings.some(l => l.baseUrl === v.value.baseUrl && l.path === v.value.path && l.method === v.value.method)) {
-      res.status(409).json({ error: "This endpoint is already listed", code: "duplicate" }); return;
+    const sameEndpoint = (l: Listing) => l.baseUrl === v.value.baseUrl && l.path === v.value.path && l.method === v.value.method;
+    if (listings.some(sameEndpoint)) { res.status(409).json({ error: "This endpoint is already listed", code: "duplicate" }); return; }
+    const payout = v.value.payTo.toLowerCase();
+    if (listings.filter(l => !trusted.has(l.id) && l.payTo.toLowerCase() === payout).length >= MAX_PER_PAYOUT) {
+      res.status(409).json({ error: "Too many listings for this payout address", code: "payout_limit" }); return;
     }
     const listing: Listing = { ...v.value, id: randomUUID(), status: "pending", lastCheckedAt: null, createdAt: new Date().toISOString() };
-    listing.status = await probe(listing);
+    // Only endpoints that really ask for this payout address and price are accepted. Nothing dead is stored.
+    const verdict = await inspect(listing);
+    if (!verdict.ok) { res.status(422).json({ error: `Listing rejected: ${verdict.reason}`, code: verdict.reason }); return; }
+    if (listings.some(sameEndpoint)) { res.status(409).json({ error: "This endpoint is already listed", code: "duplicate" }); return; } // lost a race
+    listing.status = "healthy";
     listing.lastCheckedAt = new Date().toISOString();
     listings.push(listing);
     await save();
     res.status(201).json(withQuote(listing));
   });
 
-  router.post("/:id/check", async (req, res) => {
+  router.post("/:id/check", sameOriginOnly, checkPerIp, async (req, res) => {
     const l = listings.find(x => x.id === req.params.id);
     if (!l) { res.status(404).json({ error: "Not found", code: "not_found" }); return; }
     if (l.lastCheckedAt && Date.now() - Date.parse(l.lastCheckedAt) < RECHECK_MIN_INTERVAL_MS) {
@@ -256,8 +401,19 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: stri
     res.json(withQuote(l));
   });
 
+  // Operator takedown. Disabled until ADMIN_TOKEN is set; the operator's own listing cannot be removed.
+  router.delete("/:id", adminPerIp, adminOnly, async (req, res) => {
+    const id = String(req.params.id);
+    if (trusted.has(id)) { res.status(403).json({ error: "This listing is managed by the operator", code: "forbidden" }); return; }
+    const before = listings.length;
+    listings = listings.filter(l => l.id !== id);
+    if (listings.length === before) { res.status(404).json({ error: "Not found", code: "not_found" }); return; }
+    await save();
+    res.status(204).end();
+  });
+
   // ── Read-only proxy for Circle's public Agent Marketplace discovery (no API key needed) ──
-  router.get("/discover", async (req, res) => {
+  router.get("/discover", discoverPerIp, discoverGlobal, async (req, res) => {
     const qs = new URLSearchParams({ type: "http", limit: "12" });
     const q = typeof req.query.q === "string" ? req.query.q.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 64) : "";
     if (q) qs.set("query", q);

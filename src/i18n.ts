@@ -180,7 +180,7 @@ export const translations: Record<LangCode, T> = {
     howSubtitle: '完整的 x402 + Circle Gateway 纳米支付协议 — 五步完成，无 Gas，无注册',
     howStep1Title: 'Agent 发出无授权请求',
     howStep1Body:
-      'AI Agent 直接调用 API 接口，无需 API 密钥、OAuth Token 或预先注册。服务器无需提前知道 Agent 的存在。',
+      'AI Agent 直接调用 API 接口，无需 API 密钥、OAuth 令牌 或预先注册。服务器无需提前知道 Agent 的存在。',
     howStep2Title: '服务器返回 HTTP 402 及支付要求',
     howStep2Body:
       '服务器返回 HTTP 402 Payment Required，附带机器可读的 JSON：价格（USDC）、卖家 EVM 地址、支持的网络和支付方案。',
@@ -226,9 +226,9 @@ export const translations: Record<LangCode, T> = {
   // ── Español ───────────────────────────────────────────────────
   es: {
     docs: 'Documentación',
-    heroBadgeNetwork: 'Arc Testnet',
+    heroBadgeNetwork: 'Red de pruebas Arc',
     heroBadgeProtocol: 'HTTP x402',
-    heroBadgeAuth: 'Auth sin Gas',
+    heroBadgeAuth: 'Autorización sin gas',
     heroHeadline1: 'El mercado de APIs',
     heroHeadline2: 'creado para agentes IA',
     heroSubtitle:
@@ -247,17 +247,17 @@ export const translations: Record<LangCode, T> = {
     howSubtitle: 'El protocolo completo x402 + Circle Gateway Nanopagos — cinco pasos, sin gas, sin registro',
     howStep1Title: 'El agente envía una solicitud sin autenticación',
     howStep1Body:
-      'El agente de IA llama al endpoint de la API sin clave de API, sin token OAuth y sin registro previo. El servidor no necesita conocer al agente con antelación.',
+      'El agente de IA llama a la API sin clave de API, sin credenciales OAuth y sin registro previo. El servidor no necesita conocer al agente con antelación.',
     howStep2Title: 'El servidor responde HTTP 402 con requisitos de pago',
     howStep2Body:
       'El servidor responde con HTTP 402 Payment Required y un cuerpo JSON legible por máquina: precio en USDC, dirección EVM del vendedor, red aceptada y esquema de pago.',
     howStep3Title: 'El agente firma una autorización EIP-3009 fuera de la cadena',
     howStep3Body:
-      'El agente analiza los requisitos de pago y firma un mensaje transferWithAuthorization (EIP-3009) desde su billetera. Firma puramente criptográfica — sin transacción on-chain, sin gas ni confirmación de bloque.',
+      'El agente analiza los requisitos de pago y firma un mensaje transferWithAuthorization (EIP-3009) desde su billetera. Firma puramente criptográfica — sin transacción en la cadena, sin gas ni confirmación de bloque.',
     howStep4Title: 'El agente reintenta con la cabecera X-Payment',
     howStep4Body:
-      'El agente reintenta con la firma EIP-3009 codificada en base64 en la cabecera X-Payment. El middleware Gateway verifica la firma en menos de un milisegundo y devuelve inmediatamente la respuesta pagada.',
-    howStep5Title: 'Circle Gateway agrupa y liquida on-chain',
+      'El agente reintenta con la firma EIP-3009 codificada en base64 en la cabecera X-Payment. El componente intermedio de Gateway verifica la firma en menos de un milisegundo y devuelve inmediatamente la respuesta pagada.',
+    howStep5Title: 'Circle Gateway agrupa y liquida en la cadena',
     howStep5Body:
       'Circle Gateway recopila miles de autorizaciones firmadas fuera de la cadena y envía periódicamente una sola transacción agrupada al contrato USDC, transfiriendo los pagos acumulados a la billetera del vendedor.',
     catalogTitle: 'Catálogo de servicios',
@@ -278,7 +278,7 @@ export const translations: Record<LangCode, T> = {
     cardTabUseCases: 'Casos de uso',
     cardRequest: 'Solicitud',
     cardResponse: 'Respuesta',
-    cardExamplePayload: 'Ejemplo de payload',
+    cardExamplePayload: 'Ejemplo de cuerpo de la solicitud',
     cardUseCases: 'Casos de uso',
     cardSla: 'SLA',
     cardTraceLabel: 'Traza del agente',
@@ -286,20 +286,20 @@ export const translations: Record<LangCode, T> = {
     footerRunning: 'Ejecutado en',
     footerSettled: 'Liquidado vía',
     footerStandard: 'Estándar',
-    footerMonetise: 'Monetiza tu endpoint:',
-    footerTestnet: 'Solo testnet · Sin fondos reales · Circle Gateway agrupa autorizaciones off-chain y liquida on-chain periódicamente',
+    footerMonetise: 'Monetiza tu punto de acceso:',
+    footerTestnet: 'Solo red de pruebas · Sin fondos reales · Circle Gateway agrupa autorizaciones fuera de la cadena y las liquida en la cadena periódicamente',
   },
 
   // ── Français ──────────────────────────────────────────────────
   fr: {
     docs: 'Documentation',
-    heroBadgeNetwork: 'Arc Testnet',
+    heroBadgeNetwork: 'Réseau de test Arc',
     heroBadgeProtocol: 'HTTP x402',
-    heroBadgeAuth: 'Auth sans Gas',
+    heroBadgeAuth: 'Autorisation sans frais de gaz',
     heroHeadline1: 'La marketplace d\'API',
     heroHeadline2: 'conçue pour les agents IA',
     heroSubtitle:
-      'Tout agent IA peut découvrir, évaluer et payer ces services API automatiquement grâce au protocole HTTP 402 et aux Nanopaiements Circle Gateway. Sans clé API. Sans inscription. Sans gas. Uniquement en USDC.',
+      'Tout agent IA peut découvrir, évaluer et payer ces services API automatiquement grâce au protocole HTTP 402 et aux Nanopaiements Circle Gateway. Sans clé API. Sans inscription. Sans frais de gaz. Uniquement en USDC.',
     heroCta: 'Voir le code de l\'agent',
     heroCtaHide: 'Masquer le code',
     heroCtaSeller: 'Guide vendeur',
@@ -311,20 +311,20 @@ export const translations: Record<LangCode, T> = {
     statSettlement: 'Règlement',
     statNetwork: 'Réseau',
     howTitle: 'Comment ça marche',
-    howSubtitle: 'Le protocole complet x402 + Circle Gateway Nanopaiements — cinq étapes, sans gas, sans inscription',
+    howSubtitle: 'Le protocole complet x402 + Circle Gateway Nanopaiements — cinq étapes, sans frais de gaz, sans inscription',
     howStep1Title: "L'agent envoie une requête non authentifiée",
     howStep1Body:
-      "L'agent IA appelle l'endpoint API sans clé, sans token OAuth et sans inscription préalable. Le serveur n'a pas besoin de connaître l'agent à l'avance.",
+      "L'agent IA appelle l'API sans clé, sans jeton OAuth et sans inscription préalable. Le serveur n'a pas besoin de connaître l'agent à l'avance.",
     howStep2Title: 'Le serveur répond HTTP 402 avec les exigences de paiement',
     howStep2Body:
       'Le serveur répond HTTP 402 Payment Required avec un corps JSON lisible par machine : prix en USDC, adresse EVM du vendeur, réseau accepté et schéma de paiement.',
     howStep3Title: "L'agent signe une autorisation EIP-3009 hors chaîne",
     howStep3Body:
-      "L'agent analyse les exigences de paiement et signe un message transferWithAuthorization (EIP-3009) depuis son portefeuille. Signature purement cryptographique — pas de transaction on-chain, pas de gas, pas de confirmation de bloc.",
-    howStep4Title: "L'agent réessaie avec le header X-Payment",
+      "L'agent analyse les exigences de paiement et signe un message transferWithAuthorization (EIP-3009) depuis son portefeuille. Signature purement cryptographique — pas de transaction sur la chaîne, pas de frais de gaz, pas de confirmation de bloc.",
+    howStep4Title: "L'agent réessaie avec l'en-tête X-Payment",
     howStep4Body:
-      "L'agent réessaie avec la signature EIP-3009 encodée en base64 dans le header X-Payment. Le middleware Gateway vérifie la signature en moins d'une milliseconde et renvoie immédiatement la réponse payante.",
-    howStep5Title: 'Circle Gateway regroupe et règle on-chain',
+      "L'agent réessaie avec la signature EIP-3009 encodée en base64 dans l'en-tête X-Payment. L'intergiciel Gateway vérifie la signature en moins d'une milliseconde et renvoie immédiatement la réponse payante.",
+    howStep5Title: 'Circle Gateway regroupe et règle sur la chaîne',
     howStep5Body:
       'Circle Gateway collecte des milliers d\'autorisations signées hors chaîne et soumet périodiquement une seule transaction groupée au contrat USDC, transférant les paiements accumulés vers le portefeuille du vendeur.',
     catalogTitle: 'Catalogue de services',
@@ -345,7 +345,7 @@ export const translations: Record<LangCode, T> = {
     cardTabUseCases: 'Cas d\'usage',
     cardRequest: 'Requête',
     cardResponse: 'Réponse',
-    cardExamplePayload: 'Exemple de payload',
+    cardExamplePayload: 'Exemple de corps de requête',
     cardUseCases: "Cas d'usage",
     cardSla: 'SLA',
     cardTraceLabel: "Trace de l'agent",
@@ -353,14 +353,14 @@ export const translations: Record<LangCode, T> = {
     footerRunning: 'En cours sur',
     footerSettled: 'Réglé via',
     footerStandard: 'Standard',
-    footerMonetise: 'Monétisez votre endpoint :',
-    footerTestnet: 'Testnet uniquement · Sans fonds réels · Circle Gateway regroupe les autorisations off-chain et règle on-chain périodiquement',
+    footerMonetise: "Monétisez votre point d'accès :",
+    footerTestnet: 'Réseau de test uniquement · Sans fonds réels · Circle Gateway regroupe les autorisations hors chaîne et règle sur la chaîne périodiquement',
   },
 
   // ── Deutsch ───────────────────────────────────────────────────
   de: {
     docs: 'Dokumentation',
-    heroBadgeNetwork: 'Arc Testnet',
+    heroBadgeNetwork: 'Arc-Testnetz',
     heroBadgeProtocol: 'HTTP x402',
     heroBadgeAuth: 'Gaslose Authentifizierung',
     heroHeadline1: 'Der API-Marktplatz',
@@ -381,19 +381,19 @@ export const translations: Record<LangCode, T> = {
     howSubtitle: 'Das vollständige x402 + Circle Gateway Nanopayments-Protokoll — fünf Schritte, kein Gas, keine Registrierung',
     howStep1Title: 'Agent sendet eine unauthentifizierte Anfrage',
     howStep1Body:
-      'Der KI-Agent ruft den API-Endpunkt ohne API-Schlüssel, OAuth-Token oder vorherige Registrierung auf. Der Server muss den Agenten nicht vorab kennen.',
+      'Der KI-Agent ruft den API-Endpunkt ohne API-Schlüssel, OAuth-Zugangsdaten oder vorherige Registrierung auf. Der Server muss den Agenten nicht vorab kennen.',
     howStep2Title: 'Server antwortet mit HTTP 402 und Zahlungsanforderungen',
     howStep2Body:
       'Der Server antwortet mit HTTP 402 Payment Required und einem maschinenlesbaren JSON-Body: Preis in USDC, EVM-Adresse des Verkäufers, akzeptiertes Netzwerk und Zahlungsschema.',
-    howStep3Title: 'Agent signiert eine Off-Chain-EIP-3009-Autorisierung',
+    howStep3Title: 'Agent signiert eine EIP-3009-Autorisierung außerhalb der Blockchain',
     howStep3Body:
-      'Der Agent analysiert die Zahlungsanforderungen und signiert eine transferWithAuthorization (EIP-3009)-Nachricht aus seiner Wallet. Rein kryptografische Signatur — keine On-Chain-Transaktion, kein Gas, keine Blockbestätigung erforderlich.',
-    howStep4Title: 'Agent wiederholt die Anfrage mit dem X-Payment-Header',
+      'Der Agent analysiert die Zahlungsanforderungen und signiert eine transferWithAuthorization (EIP-3009)-Nachricht aus seiner Wallet. Rein kryptografische Signatur — keine Transaktion auf der Blockchain, kein Gas, keine Blockbestätigung erforderlich.',
+    howStep4Title: 'Agent wiederholt die Anfrage mit der X-Payment-Kopfzeile',
     howStep4Body:
-      'Der Agent sendet die Anfrage erneut mit der base64-kodierten EIP-3009-Signatur im X-Payment-Header. Die Gateway-Middleware überprüft die Signatur in unter einer Millisekunde und gibt sofort die bezahlte Antwort zurück.',
-    howStep5Title: 'Circle Gateway bündelt und rechnet On-Chain ab',
+      'Der Agent sendet die Anfrage erneut mit der base64-kodierten EIP-3009-Signatur in der X-Payment-Kopfzeile. Die Gateway-Zwischenschicht überprüft die Signatur in unter einer Millisekunde und gibt sofort die bezahlte Antwort zurück.',
+    howStep5Title: 'Circle Gateway bündelt und rechnet auf der Blockchain ab',
     howStep5Body:
-      'Circle Gateway sammelt Tausende signierter Autorisierungen off-chain und sendet periodisch eine einzelne gebündelte Transaktion an den USDC-Vertrag, um alle Zahlungen an die Wallet des Verkäufers zu überweisen.',
+      'Circle Gateway sammelt Tausende signierter Autorisierungen außerhalb der Blockchain und sendet periodisch eine einzelne gebündelte Transaktion an den USDC-Vertrag, um alle Zahlungen an die Wallet des Verkäufers zu überweisen.',
     catalogTitle: 'Dienstkatalog',
     catalogSubtitle: '8 kostenpflichtige APIs · Alle durch HTTP 402 geschützt · Abgerechnet über Circle Gateway',
     catalogFilterAll: 'Alle',
@@ -412,7 +412,7 @@ export const translations: Record<LangCode, T> = {
     cardTabUseCases: 'Anwendungsfälle',
     cardRequest: 'Anfrage',
     cardResponse: 'Antwort',
-    cardExamplePayload: 'Beispiel-Payload',
+    cardExamplePayload: 'Beispiel-Anfragekörper',
     cardUseCases: 'Anwendungsfälle',
     cardSla: 'SLA',
     cardTraceLabel: 'Agenten-Trace',
@@ -420,8 +420,8 @@ export const translations: Record<LangCode, T> = {
     footerRunning: 'Läuft auf',
     footerSettled: 'Abgerechnet über',
     footerStandard: 'Standard',
-    footerMonetise: 'Monetarisieren Sie Ihren Endpunkt:',
-    footerTestnet: 'Nur Testnet · Keine echten Mittel · Circle Gateway bündelt Off-Chain-Autorisierungen und rechnet On-Chain periodisch ab',
+    footerMonetise: 'Monetarisiere deinen Endpunkt:',
+    footerTestnet: 'Nur Testnetz · Keine echten Mittel · Circle Gateway bündelt Autorisierungen außerhalb der Blockchain und rechnet sie regelmäßig auf der Blockchain ab',
   },
 
   // ── 日本語 ────────────────────────────────────────────────────
@@ -436,7 +436,7 @@ export const translations: Record<LangCode, T> = {
       'どのAIエージェントも、HTTP 402プロトコルとCircle Gateway ナノペイメントを使って、これらのAPIサービスを自動的に発見・評価・支払いできます。APIキー不要、登録不要、ガス不要。USDCだけで完結。',
     heroCta: 'エージェントコードを表示',
     heroCtaHide: 'コードを隠す',
-    heroCtaSeller: 'セラークイックスタート',
+    heroCtaSeller: '販売者向けクイックスタート',
     statServices: 'サービス数',
     statAvgResponse: '平均応答時間',
     statMinPrice: '最低価格',
@@ -488,7 +488,7 @@ export const translations: Record<LangCode, T> = {
     footerSettled: '決済:',
     footerStandard: 'プロトコル標準',
     footerMonetise: 'エンドポイントを収益化:',
-    footerTestnet: 'テストネットのみ · 実資金なし · Circle GatewayはオフチェーンでAuthorizeを一括収集し、定期的にオンチェーンで決済します',
+    footerTestnet: 'テストネットのみ · 実資金なし · Circle Gatewayは承認をオフチェーンでまとめて収集し、定期的にオンチェーンで決済します',
   },
 
   // ── العربية ──────────────────────────────────────────────────
@@ -521,7 +521,7 @@ export const translations: Record<LangCode, T> = {
       'يستجيب الخادم بـ HTTP 402 Payment Required مع جسم JSON قابل للقراءة آلياً: السعر بالـ USDC، عنوان EVM للبائع، الشبكة المقبولة، ومخطط الدفع.',
     howStep3Title: 'يوقّع الوكيل تفويض EIP-3009 خارج السلسلة',
     howStep3Body:
-      'يحلل الوكيل متطلبات الدفع ويوقّع رسالة transferWithAuthorization (EIP-3009) من محفظته. توقيع تشفيري بحت — بدون معاملة on-chain، بدون غاز، بدون تأكيد كتلة.',
+      'يحلل الوكيل متطلبات الدفع ويوقّع رسالة transferWithAuthorization (EIP-3009) من محفظته. توقيع تشفيري بحت — بدون معاملة على السلسلة، بدون غاز، بدون تأكيد كتلة.',
     howStep4Title: 'يُعيد الوكيل المحاولة مع ترويسة X-Payment',
     howStep4Body:
       'يُعيد الوكيل المحاولة مع توقيع EIP-3009 المُرمَّز بـ base64 في ترويسة X-Payment. يتحقق وسيط Gateway من التوقيع خلال أقل من ميلي ثانية ويُعيد الاستجابة المدفوعة فوراً.',
@@ -555,19 +555,19 @@ export const translations: Record<LangCode, T> = {
     footerSettled: 'مُسوَّى عبر',
     footerStandard: 'المعيار',
     footerMonetise: 'اجعل نقطة نهايتك مدفوعة:',
-    footerTestnet: 'شبكة تجريبية فقط · بدون أموال حقيقية · يجمع Circle Gateway التفويضات خارج السلسلة ويُسوِّيها on-chain بشكل دوري',
+    footerTestnet: 'شبكة تجريبية فقط · بدون أموال حقيقية · يجمع Circle Gateway التفويضات خارج السلسلة ويُسوِّيها على السلسلة بشكل دوري',
   },
 
   // ── Português ─────────────────────────────────────────────────
   pt: {
     docs: 'Documentação',
-    heroBadgeNetwork: 'Arc Testnet',
+    heroBadgeNetwork: 'Rede de teste Arc',
     heroBadgeProtocol: 'HTTP x402',
-    heroBadgeAuth: 'Auth sem Gas',
+    heroBadgeAuth: 'Autorização sem gás',
     heroHeadline1: 'O marketplace de APIs',
     heroHeadline2: 'criado para agentes IA',
     heroSubtitle:
-      'Qualquer agente de IA pode descobrir, avaliar e pagar por estes serviços de API automaticamente usando o protocolo HTTP 402 e os Nanopagamentos Circle Gateway. Sem chaves de API. Sem cadastro. Sem gas. Apenas USDC.',
+      'Qualquer agente de IA pode descobrir, avaliar e pagar por estes serviços de API automaticamente usando o protocolo HTTP 402 e os Nanopagamentos Circle Gateway. Sem chaves de API. Sem cadastro. Sem gás. Apenas USDC.',
     heroCta: 'Ver código do agente',
     heroCtaHide: 'Ocultar código',
     heroCtaSeller: 'Início rápido do vendedor',
@@ -579,20 +579,20 @@ export const translations: Record<LangCode, T> = {
     statSettlement: 'Liquidação',
     statNetwork: 'Rede',
     howTitle: 'Como funciona',
-    howSubtitle: 'O protocolo completo x402 + Circle Gateway Nanopagamentos — cinco etapas, sem gas, sem cadastro',
+    howSubtitle: 'O protocolo completo x402 + Circle Gateway Nanopagamentos — cinco etapas, sem gás, sem cadastro',
     howStep1Title: 'O agente envia uma requisição sem autenticação',
     howStep1Body:
-      'O agente de IA chama o endpoint da API sem chave de API, sem token OAuth e sem cadastro prévio. O servidor não precisa conhecer o agente com antecedência.',
+      'O agente de IA chama a API sem chave de API, sem credenciais OAuth e sem cadastro prévio. O servidor não precisa conhecer o agente com antecedência.',
     howStep2Title: 'O servidor responde HTTP 402 com requisitos de pagamento',
     howStep2Body:
       'O servidor responde com HTTP 402 Payment Required e um corpo JSON legível por máquina: preço em USDC, endereço EVM do vendedor, rede aceita e esquema de pagamento.',
     howStep3Title: 'O agente assina uma autorização EIP-3009 fora da cadeia',
     howStep3Body:
-      'O agente analisa os requisitos de pagamento e assina uma mensagem transferWithAuthorization (EIP-3009) de sua carteira. Assinatura puramente criptográfica — sem transação on-chain, sem gas, sem confirmação de bloco.',
+      'O agente analisa os requisitos de pagamento e assina uma mensagem transferWithAuthorization (EIP-3009) de sua carteira. Assinatura puramente criptográfica — sem transação na cadeia, sem gás, sem confirmação de bloco.',
     howStep4Title: 'O agente tenta novamente com o cabeçalho X-Payment',
     howStep4Body:
-      'O agente tenta novamente com a assinatura EIP-3009 codificada em base64 no cabeçalho X-Payment. O middleware Gateway verifica a assinatura em menos de um milissegundo e retorna imediatamente a resposta paga.',
-    howStep5Title: 'Circle Gateway agrupa e liquida on-chain',
+      'O agente tenta novamente com a assinatura EIP-3009 codificada em base64 no cabeçalho X-Payment. A camada intermediária do Gateway verifica a assinatura em menos de um milissegundo e retorna imediatamente a resposta paga.',
+    howStep5Title: 'Circle Gateway agrupa e liquida na cadeia',
     howStep5Body:
       'O Circle Gateway coleta milhares de autorizações assinadas fora da cadeia e envia periodicamente uma única transação em lote ao contrato USDC, transferindo os pagamentos acumulados para a carteira do vendedor.',
     catalogTitle: 'Catálogo de serviços',
@@ -613,7 +613,7 @@ export const translations: Record<LangCode, T> = {
     cardTabUseCases: 'Casos de uso',
     cardRequest: 'Requisição',
     cardResponse: 'Resposta',
-    cardExamplePayload: 'Exemplo de payload',
+    cardExamplePayload: 'Exemplo de corpo da requisição',
     cardUseCases: 'Casos de uso',
     cardSla: 'SLA',
     cardTraceLabel: 'Rastreamento do agente',
@@ -621,8 +621,8 @@ export const translations: Record<LangCode, T> = {
     footerRunning: 'Executando em',
     footerSettled: 'Liquidado via',
     footerStandard: 'Padrão',
-    footerMonetise: 'Monetize seu endpoint:',
-    footerTestnet: 'Somente testnet · Sem fundos reais · Circle Gateway agrupa autorizações off-chain e liquida on-chain periodicamente',
+    footerMonetise: 'Monetize seu ponto de acesso:',
+    footerTestnet: 'Somente rede de teste · Sem fundos reais · Circle Gateway agrupa autorizações fora da cadeia e as liquida na cadeia periodicamente',
   },
 
   // ── 한국어 ────────────────────────────────────────────────────

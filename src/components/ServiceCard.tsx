@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
+import { extras, fmt, NUMBER_LOCALE } from '../locales'
 import { SessionCostContext } from '../App'
 import { LiveFeedContext } from './LiveFeed'
 
@@ -61,19 +62,29 @@ const CATEGORY_ICON: Record<string, string> = {
 // ──────────────────────────────────────────
 // Sub-components
 // ──────────────────────────────────────────
-function SchemaTable({ schema, title }: { schema: Record<string, string>; title: string }) {
+function SchemaTable({ schema, title, serviceId }: { schema: Record<string, string>; title: string; serviceId: string }) {
+  const { lang, t } = useLang()
   const entries = Object.entries(schema)
-  if (entries.length === 0) return <p className="text-[11px] text-[var(--subtle)] italic">No parameters</p>
+  if (entries.length === 0) return <p className="text-[11px] text-[var(--subtle)] italic">{t.cardNoParams}</p>
+  const tx = extras[lang].services[serviceId]
   return (
     <div>
       <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--subtle)] mb-1.5">{title}</div>
       <div className="space-y-1">
-        {entries.map(([k, v]) => (
-          <div key={k} className="flex gap-2 text-[11px]">
-            <span className="mono text-[var(--accent)] shrink-0">{k}</span>
-            <span className="text-[var(--subtle)]">{v}</span>
-          </div>
-        ))}
+        {entries.map(([k, v]) => {
+          // Source strings look like "type  — description". Only the description is human text.
+          const [type, ...rest] = v.split('  — ')
+          const original = rest.join('  — ')
+          // Never fall back to English text in another language.
+          const desc = tx?.fields[k] ?? t.commonFields[k] ?? (lang === 'en' ? original : '')
+          return (
+            <div key={k} className="flex flex-wrap gap-x-2 text-[11px]">
+              <span className="mono text-[var(--accent)] shrink-0">{k}</span>
+              <span className="mono text-[var(--subtle)]/80">{type}</span>
+              {desc && <span className="text-[var(--subtle)]">{desc}</span>}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -83,7 +94,9 @@ function SchemaTable({ schema, title }: { schema: Record<string, string>; title:
 // Main component
 // ──────────────────────────────────────────
 export function ServiceCard({ service }: { service: AgentService }) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
+  const tx = extras[lang].services[service.id]
+  const slaPct = new Intl.NumberFormat(NUMBER_LOCALE[lang], { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(parseFloat(service.sla))
   const { add: addSessionCost } = useContext(SessionCostContext)
   const { push: pushFeed } = useContext(LiveFeedContext)
   const [status, setStatus] = useState<PayStatus>('idle')
@@ -114,8 +127,9 @@ export function ServiceCard({ service }: { service: AgentService }) {
     }, 80)
 
     // ── Step 1: unauthenticated request → 402 ──
+    addLog({ type: 'info',  text: t.traceSimNote })
     addLog({ type: 'agent', text: `→  ${service.method} ${service.endpoint}` })
-    addLog({ type: 'info',  text: `   [no credentials attached]` })
+    addLog({ type: 'info',  text: `   ${t.traceNoCreds}` })
     await sleep(600)
 
     try {
@@ -127,32 +141,32 @@ export function ServiceCard({ service }: { service: AgentService }) {
       const challenge = await unauth.json() as { accepts?: Array<{ network: string; priceUsdc?: string }>; price?: string }
       addLog({ type: 'server', text: `←  HTTP ${unauth.status} Payment Required` })
       const net = challenge.accepts?.map(a => a.network).join(', ') ?? 'ARC-TESTNET'
-      addLog({ type: 'info',  text: `   price   : ${challenge.price ?? service.price} USDC` })
-      addLog({ type: 'info',  text: `   network : ${net}` })
-      addLog({ type: 'info',  text: `   scheme  : gateway-nanopayment` })
+      addLog({ type: 'info',  text: `   ${t.traceLblPrice}: ${challenge.price ?? service.price} USDC` })
+      addLog({ type: 'info',  text: `   ${t.traceLblNetwork}: ${net}` })
+      addLog({ type: 'info',  text: `   ${t.traceLblScheme}: gateway-nanopayment` })
     } catch {
       addLog({ type: 'server', text: `←  HTTP 402 Payment Required` })
-      addLog({ type: 'info',  text: `   price   : ${service.price} USDC` })
-      addLog({ type: 'info',  text: `   network : ARC-TESTNET` })
-      addLog({ type: 'info',  text: `   scheme  : gateway-nanopayment` })
+      addLog({ type: 'info',  text: `   ${t.traceLblPrice}: ${service.price} USDC` })
+      addLog({ type: 'info',  text: `   ${t.traceLblNetwork}: ARC-TESTNET` })
+      addLog({ type: 'info',  text: `   ${t.traceLblScheme}: gateway-nanopayment` })
     }
 
     // ── Step 2: negotiate ──
     setStatus('negotiating')
     await sleep(450)
-    addLog({ type: 'agent', text: `   Parsing payment requirements…` })
+    addLog({ type: 'agent', text: `   ${t.traceParsing}` })
     await sleep(400)
-    addLog({ type: 'agent', text: `   Building EIP-3009 transferWithAuthorization` })
+    addLog({ type: 'agent', text: `   ${t.traceBuilding}` })
     await sleep(300)
-    addLog({ type: 'agent', text: `   Signing with agent wallet (off-chain, no gas)` })
+    addLog({ type: 'agent', text: `   ${t.traceSigning}` })
     await sleep(500)
-    addLog({ type: 'info',  text: `   Signature: 0xd3a5…f8b2 ✓` })
+    addLog({ type: 'info',  text: `   ${t.traceSignatureSim}` })
 
     // ── Step 3: paid retry ──
     setStatus('paying')
     await sleep(300)
     addLog({ type: 'agent', text: `→  ${service.method} ${service.endpoint}` })
-    addLog({ type: 'info',  text: `   X-Payment: <EIP-3009 signed auth>` })
+    addLog({ type: 'info',  text: `   X-Payment: ${t.traceSignedAuth}` })
     await sleep(650)
 
     try {
@@ -166,21 +180,21 @@ export function ServiceCard({ service }: { service: AgentService }) {
       })
       const data = await paid.json() as Record<string, unknown>
       addLog({ type: 'server',  text: `←  HTTP 200 OK` })
-      addLog({ type: 'success', text: `   Payment queued for Circle Gateway batch` })
-      addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
+      addLog({ type: 'success', text: `   ${t.traceQueued}` })
+      addLog({ type: 'success', text: `   ${fmt(t.traceAuthorised, { price: service.price })}` })
       setResponse(JSON.stringify(data, null, 2))
       addSessionCost(service.priceUsd)
       setCallCount(c => c + 1)
-      pushFeed({ service: service.name, price: service.price, agent: '0xYou…' })
+      pushFeed({ service: service.id, price: service.price, agent: '@you' })
       setStatus('success')
     } catch {
       addLog({ type: 'server',  text: `←  HTTP 200 OK` })
-      addLog({ type: 'success', text: `   Payment queued for Circle Gateway batch` })
-      addLog({ type: 'success', text: `   ${service.price} USDC authorised — settled off-chain` })
+      addLog({ type: 'success', text: `   ${t.traceQueued}` })
+      addLog({ type: 'success', text: `   ${fmt(t.traceAuthorised, { price: service.price })}` })
       setResponse(JSON.stringify({ result: 'Service response delivered', settled: true, paidUsdc: service.price }, null, 2))
       addSessionCost(service.priceUsd)
       setCallCount(c => c + 1)
-      pushFeed({ service: service.name, price: service.price, agent: '0xYou…' })
+      pushFeed({ service: service.id, price: service.price, agent: '@you' })
       setStatus('success')
     }
   }
@@ -217,9 +231,9 @@ export function ServiceCard({ service }: { service: AgentService }) {
         {/* Category + tags + call count badge */}
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--subtle)] px-2 py-0.5 rounded-full border border-[var(--border)]">
-            {CATEGORY_ICON[service.category] ?? '●'} {service.category}
+            {CATEGORY_ICON[service.category] ?? '●'} {t.categories[service.category] ?? service.category}
           </span>
-          {service.tags.slice(0, 2).map(tag => (
+          {lang === 'en' && service.tags.slice(0, 2).map(tag => (
             <span key={tag} className="text-[10px] text-[var(--subtle)]/70">#{tag}</span>
           ))}
           {callCount > 0 && (
@@ -229,25 +243,25 @@ export function ServiceCard({ service }: { service: AgentService }) {
               animate={{ scale: 1,   opacity: 1 }}
               className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25"
             >
-              {callCount}× called
+              {fmt(t.cardCalled, { n: callCount })}
             </motion.span>
           )}
         </div>
 
         {/* Name + price */}
         <div className="flex items-start justify-between gap-3 mb-1">
-          <h3 className="display text-base font-semibold text-[var(--ink)] leading-tight">{service.name}</h3>
+          <h3 className="display text-base font-semibold text-[var(--ink)] leading-tight">{tx?.name ?? service.name}</h3>
           <div className="shrink-0 flex flex-col items-end">
             <div className="flex items-center gap-1">
               <TokenUSDC variant="branded" size={14} />
               <span className="display text-base font-bold text-[var(--ink)] tabular-nums">{service.price}</span>
             </div>
-            <span className="text-[10px] text-[var(--subtle)]">USDC / call</span>
+            <span className="text-[10px] text-[var(--subtle)]">{t.cardUsdcPerCall}</span>
           </div>
         </div>
 
         {/* Description */}
-        <p className="text-xs text-[var(--muted)] leading-relaxed mb-4">{service.description}</p>
+        <p className="text-xs text-[var(--muted)] leading-relaxed mb-4">{tx?.description ?? service.description}</p>
 
         {/* Endpoint row */}
         <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[var(--surface-muted)] border border-[var(--border)]">
@@ -262,7 +276,8 @@ export function ServiceCard({ service }: { service: AgentService }) {
             </div>
             <button
               onClick={copyEndpoint}
-              title="Copy endpoint"
+              title={t.cardCopyEndpoint}
+              aria-label={t.cardCopyEndpoint}
               className="p-0.5 rounded text-[var(--subtle)] hover:text-[var(--accent)] transition-colors"
             >
               {copied ? <Check size={11} className="text-[var(--success)]" /> : <Copy size={11} />}
@@ -274,7 +289,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-1.5">
             <Shield size={11} className="text-[var(--subtle)]" />
-            <span className="text-[10px] text-[var(--subtle)]">{service.sla}</span>
+            <span className="text-[10px] text-[var(--subtle)]">{fmt(t.cardUptime, { pct: slaPct })}</span>
           </div>
           <div className="flex items-center gap-1.5">
             {isRunning ? (
@@ -296,7 +311,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
         {status === 'idle' ? (
           <button
             onClick={() => { void simulate() }}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--accent)] text-[#0d1b2f] hover:bg-[var(--accent-hover)] transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-colors"
           >
             <Zap size={12} />
             {t.cardSimulate}
@@ -327,7 +342,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
             >
               <Fuel size={11} className="text-[var(--success)] shrink-0" />
               <span className="text-[11px] text-[var(--success)] font-medium">
-                $0.00 gas paid &mdash; EIP-3009 off-chain auth, no on-chain tx needed
+                {t.cardGasSaved}
               </span>
             </motion.div>
           )}
@@ -366,7 +381,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="overflow-hidden bg-[#060f1c] border-t border-[var(--border)]"
+            className="overflow-hidden bg-[var(--code-bg)] border-t border-[var(--border)]"
           >
             <div className="p-4">
               {logs.length === 0 && !isRunning ? (
@@ -414,8 +429,8 @@ export function ServiceCard({ service }: { service: AgentService }) {
             className="overflow-hidden border-t border-[var(--border)]"
           >
             <div className="p-4 space-y-4 bg-[var(--surface-muted)]">
-              <SchemaTable schema={service.requestSchema} title={t.cardRequest} />
-              <SchemaTable schema={service.responseSchema} title={t.cardResponse} />
+              <SchemaTable schema={service.requestSchema} title={t.cardRequest} serviceId={service.id} />
+              <SchemaTable schema={service.responseSchema} title={t.cardResponse} serviceId={service.id} />
               {service.examplePayload && (
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--subtle)] mb-1.5">
@@ -444,7 +459,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
                 {t.cardUseCases}
               </div>
               <ul className="space-y-1.5">
-                {service.useCases.map((uc, i) => (
+                {(tx?.useCases ?? service.useCases).map((uc, i) => (
                   <li key={i} className="flex items-start gap-2 text-xs text-[var(--muted)]">
                     <span className="text-[var(--accent)] shrink-0 mt-0.5">→</span>
                     {uc}

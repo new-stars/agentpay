@@ -11,8 +11,10 @@ Built with [Arc Studio](https://studio.arc.io)
 - List your own paid API in the seller marketplace. Listings are health-checked and only offered to agents when the endpoint answers HTTP 402.
 - See the buyer price (seller price plus 0.5% broker fee) for every listing.
 - Run a buyer-agent lookup that picks the cheapest healthy seller inside a budget.
+- Search the public Circle Agent Marketplace discovery feed for real x402 sellers (read-only).
+- Switch the whole interface between 9 languages. The language choice is remembered in the browser.
 
-Payments in the catalog demo and the buyer lookup are simulated. No funds move.
+Payments in the catalog demo and the buyer lookup are simulated, and the live activity feed and totals are sample data. No funds move. A design for collecting the broker fee for real is in `docs/broker-settlement.md`.
 
 ## Tech stack
 

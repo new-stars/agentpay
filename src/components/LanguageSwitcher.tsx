@@ -6,7 +6,7 @@ import { useLang } from '../LangContext'
 import type { LangCode } from '../i18n'
 
 export function LanguageSwitcher() {
-  const { lang, setLang } = useLang()
+  const { lang, setLang, t } = useLang()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -33,7 +33,7 @@ export function LanguageSwitcher() {
       {/* Trigger */}
       <button
         onClick={() => setOpen(v => !v)}
-        aria-label="Change language"
+        aria-label={t.changeLanguage}
         className={`flex items-center gap-1.5 h-8 px-2.5 rounded-lg border text-xs font-medium transition-colors ${
           open
             ? 'border-[var(--border-strong)] bg-[var(--surface-strong)] text-[var(--ink)]'
@@ -60,7 +60,7 @@ export function LanguageSwitcher() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 top-10 z-50 w-44 rounded-xl border border-[var(--border)] bg-[#0d1b2f]/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            className="absolute right-0 top-10 z-50 w-44 rounded-xl border border-[var(--border)] bg-[var(--bg)] backdrop-blur-xl shadow-2xl overflow-hidden"
           >
             {LANGUAGES.map(l => (
               <button

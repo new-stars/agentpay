@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { TokenUSDC } from '@web3icons/react'
 import { motion } from 'framer-motion'
 import { useLang } from '../LangContext'
+import { NUMBER_LOCALE } from '../locales'
 
 // Smooth animated counter hook
 function useAnimatedNumber(target: number, decimals = 0) {
@@ -32,8 +33,10 @@ function useAnimatedNumber(target: number, decimals = 0) {
   return display
 }
 
-export function StatsBar() {
-  const { t } = useLang()
+export function StatsBar({ serviceCount }: { serviceCount: number }) {
+  const { t, lang } = useLang()
+  const nf = (n: number, digits: number) =>
+    new Intl.NumberFormat(NUMBER_LOCALE[lang], { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n)
   const [callCount, setCallCount] = useState(12_847)
   const [volumeUsdc, setVolumeUsdc] = useState(38.42)
 
@@ -49,13 +52,13 @@ export function StatsBar() {
   const animatedVolume = useAnimatedNumber(volumeUsdc, 2)
 
   const stats = [
-    { key: 'services',   label: t.statServices,    value: '12',                                       live: false, icon: false },
+    { key: 'services',   label: t.statServices,    value: nf(serviceCount, 0),                                       live: false, icon: false },
     { key: 'response',   label: t.statAvgResponse,  value: '< 200 ms',                               live: false, icon: false },
     { key: 'price',      label: t.statMinPrice,     value: '$0.001 USDC',                            live: false, icon: false },
-    { key: 'calls',      label: t.statTotalCalls,   value: Math.round(animatedCalls).toLocaleString(), live: true,  icon: false },
-    { key: 'volume',     label: t.statVolume,       value: `$${animatedVolume.toFixed(2)} USDC`,      live: true,  icon: true  },
+    { key: 'calls',      label: t.statTotalCalls,   value: nf(Math.round(animatedCalls), 0), live: true,  icon: false },
+    { key: 'volume',     label: t.statVolume,       value: `$${nf(animatedVolume, 2)} USDC`,      live: true,  icon: true  },
     { key: 'settlement', label: t.statSettlement,   value: 'Circle Gateway',                         live: false, icon: false },
-    { key: 'network',    label: t.statNetwork,      value: 'Arc Testnet',                            live: false, icon: false },
+    { key: 'network',    label: t.statNetwork,      value: t.heroBadgeNetwork,                            live: false, icon: false },
   ]
 
   return (
@@ -74,6 +77,9 @@ export function StatsBar() {
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse shrink-0" />
             )}
             <span className="text-[10px] text-[var(--subtle)] leading-tight">{s.label}</span>
+            {s.live && (
+              <span className="ml-auto text-[8px] font-semibold uppercase tracking-wider px-1 rounded border border-[var(--border)] text-[var(--subtle)]">{t.feedLive}</span>
+            )}
           </div>
           <span className={`text-sm font-semibold tabular-nums leading-tight transition-colors ${s.icon ? 'text-[var(--success)]' : 'text-[var(--ink)]'}`}>
             {s.value}

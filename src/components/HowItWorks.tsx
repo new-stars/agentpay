@@ -16,7 +16,7 @@ const STEP_CODES = [
   '← 402  { price: "0.001", network: "ARC-TESTNET", scheme: "gateway-nanopayment" }',
   'signTypedData(transferWithAuthorization { to: seller, value: 1000, nonce, deadline })',
   'POST /pay/summarize  X-Payment: base64(signedAuth)  →  200 OK + payload',
-  'Gateway.batchTransfer([auth1, auth2, …authN])  →  1 on-chain tx, N settlements',
+  '// N signed authorisations  →  1 batched settlement',
 ]
 
 export function HowItWorks() {
@@ -45,7 +45,7 @@ export function HowItWorks() {
           <p className="text-xs text-[var(--subtle)] mt-0.5">{t.howSubtitle}</p>
         </div>
         <div className="shrink-0 flex items-center gap-1.5 text-[11px] text-[var(--subtle)] group-hover:text-[var(--muted)] transition-colors">
-          <span className="hidden sm:inline">{open ? 'Collapse' : 'Expand'}</span>
+          <span className="hidden sm:inline">{open ? t.howCollapse : t.howExpand}</span>
           {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </button>
@@ -90,7 +90,7 @@ export function HowItWorks() {
                   {step.title}
                 </h3>
                 <p className="text-xs text-[var(--muted)] leading-relaxed mb-3">{step.body}</p>
-                <div className="px-3 py-2 rounded-lg bg-[#060f1c] border border-[var(--border)]">
+                <div className="px-3 py-2 rounded-lg bg-[var(--code-bg)] border border-[var(--border)]">
                   <code className="mono text-[10px] text-[var(--accent)] break-all">{STEP_CODES[i]}</code>
                 </div>
               </div>
@@ -100,12 +100,13 @@ export function HowItWorks() {
       </div>
 
       {/* Protocol reference row */}
-      <div className="mt-4 flex flex-wrap gap-3 text-[11px] text-[var(--subtle)]">
+      <p className="mt-3 text-[10px] text-[var(--subtle)]">{t.howCodeNote}</p>
+      <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[var(--subtle)]">
         {[
-          ['HTTP 402', 'RFC 7235 Payment Required'],
-          ['EIP-3009', 'transferWithAuthorization'],
-          ['Circle Gateway', 'Off-chain batch settlement'],
-          ['x402', 'Agent-native payment protocol'],
+          ['HTTP 402', t.protoHttp402],
+          ['EIP-3009', t.protoEip3009],
+          ['Circle Gateway', t.protoGateway],
+          ['x402', t.protoX402],
         ].map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5">
             <span className="mono text-[var(--accent)]">{k}</span>

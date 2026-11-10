@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ConnectKitButton } from 'connectkit'
 import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X, Sun, Moon } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
@@ -11,6 +11,7 @@ import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { LiveFeed } from './components/LiveFeed'
 import { MarketplaceSection } from './components/MarketplaceSection'
 import { useLang } from './LangContext'
+import { extras, fmt, NUMBER_LOCALE } from './locales'
 
 // ─────────────────────────────────────────────────────────────
 // Service catalog (static — names/descriptions stay English)
@@ -319,43 +320,6 @@ const SERVICES: AgentService[] = [
 const ALL_CATEGORIES = ['All', ...Array.from(new Set(SERVICES.map(s => s.category)))]
 
 // ─────────────────────────────────────────────────────────────
-// Rotating hero tagline — cycles language samples
-// ─────────────────────────────────────────────────────────────
-const HERO_LINES = [
-  { lang: 'English',    text: 'AI agents pay for APIs automatically — no sign-up, no API keys.' },
-  { lang: '中文',        text: 'AI Agent 无需注册，自动发现价格并用 USDC 完成纳米支付。' },
-  { lang: 'Español',    text: 'Los agentes de IA pagan por APIs automáticamente con USDC.' },
-  { lang: 'Français',   text: 'Les agents IA paient les APIs automatiquement en USDC.' },
-  { lang: 'Deutsch',    text: 'KI-Agenten bezahlen APIs automatisch — ohne Registrierung.' },
-  { lang: '日本語',      text: 'AIエージェントがAPIを自動的にUSDCで支払います。' },
-  { lang: 'العربية',    text: 'وكلاء الذكاء الاصطناعي يدفعون مقابل APIs تلقائياً بـ USDC.' },
-  { lang: 'Português',  text: 'Agentes de IA pagam por APIs automaticamente com USDC.' },
-  { lang: '한국어',      text: 'AI 에이전트가 USDC로 API 요금을 자동으로 지불합니다.' },
-]
-
-function RotatingHeroLine() {
-  const [idx, setIdx] = useState(0)
-  const ref = useRef<ReturnType<typeof setInterval> | null>(null)
-  useEffect(() => {
-    ref.current = setInterval(() => setIdx(i => (i + 1) % HERO_LINES.length), 3200)
-    return () => { if (ref.current) clearInterval(ref.current) }
-  }, [])
-  const line = HERO_LINES[idx]
-  return (
-    <motion.div
-      key={idx}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="flex items-baseline gap-2"
-    >
-      <span className="mono text-[10px] text-[var(--subtle)] uppercase tracking-widest shrink-0 w-20">{line.lang}</span>
-      <span className="text-sm text-[var(--muted)] leading-snug">{line.text}</span>
-    </motion.div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────
 // Theme toggle
 // ─────────────────────────────────────────────────────────────
 function useTheme() {
@@ -370,7 +334,7 @@ function useTheme() {
 export const SessionCostContext = React.createContext<{ add: (n: number) => void }>({ add: () => {} })
 
 export default function App() {
-  const { t } = useLang()
+  const { t, lang } = useLang()
   const [activeCategory, setActiveCategory] = useState('All')
   const [showSnippet, setShowSnippet] = useState(false)
   const [search, setSearch] = useState('')
@@ -381,11 +345,14 @@ export default function App() {
   const filtered = SERVICES.filter(s => {
     const matchCat = activeCategory === 'All' || s.category === activeCategory
     const q = search.toLowerCase().trim()
+    const tx = extras[lang].services[s.id]
     const matchSearch = q === '' ||
       s.name.toLowerCase().includes(q) ||
-      s.description.toLowerCase().includes(q) ||
+      (tx?.name ?? '').toLowerCase().includes(q) ||
+      (tx?.description ?? s.description).toLowerCase().includes(q) ||
       s.tags.some(tag => tag.includes(q)) ||
-      s.category.toLowerCase().includes(q)
+      s.category.toLowerCase().includes(q) ||
+      (t.categories[s.category] ?? '').toLowerCase().includes(q)
     return matchCat && matchSearch
   })
 
@@ -422,14 +389,15 @@ export default function App() {
             {sessionCost > 0 && (
               <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--success)]/15 border border-[var(--success)]/25 text-[10px] text-[var(--success)] font-medium tabular-nums">
                 <TokenUSDC variant="branded" size={10} />
-                {sessionCost.toFixed(4)} spent
+                {fmt(t.sessionSpent, { amount: new Intl.NumberFormat(NUMBER_LOCALE[lang], { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(sessionCost) })}
               </div>
             )}
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
               className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] hover:border-[var(--border-strong)] transition-colors"
-              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={dark ? t.themeToLight : t.themeToDark}
+              aria-label={dark ? t.themeToLight : t.themeToDark}
             >
               {dark ? <Sun size={13} /> : <Moon size={13} />}
             </button>
@@ -470,16 +438,13 @@ export default function App() {
               {t.heroSubtitle}
             </p>
 
-            {/* Rotating multilingual sampler (always shows all languages) */}
-            <div className="h-8 overflow-hidden mb-6">
-              <RotatingHeroLine />
-            </div>
+            <div className="mb-6" />
 
             {/* CTA row */}
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setShowSnippet(v => !v)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--accent)] text-[#0d1b2f] hover:bg-[var(--accent-hover)] transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)] transition-colors"
               >
                 <span className="mono text-xs">{'</>'}</span>
                 {showSnippet ? t.heroCtaHide : t.heroCta}
@@ -510,7 +475,7 @@ export default function App() {
         </section>
 
         {/* ── Stats bar ── */}
-        <StatsBar />
+        <StatsBar serviceCount={SERVICES.length} />
 
         {/* ── How it works ── */}
         <HowItWorks />
@@ -523,7 +488,7 @@ export default function App() {
           <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
             <div>
               <h2 className="display text-lg font-semibold text-[var(--ink)]">{t.catalogTitle}</h2>
-              <p className="text-xs text-[var(--subtle)] mt-0.5">{t.catalogSubtitle.replace('8 paid', '12 paid')}</p>
+              <p className="text-xs text-[var(--subtle)] mt-0.5">{fmt(t.catalogSubtitleN, { n: SERVICES.length })}</p>
             </div>
             <div className="flex items-center gap-1.5">
               <Filter size={11} className="text-[var(--subtle)]" />
@@ -534,11 +499,11 @@ export default function App() {
                     onClick={() => setActiveCategory(cat)}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
                       activeCategory === cat
-                        ? 'bg-[var(--accent)] text-[#0d1b2f]'
+                        ? 'bg-[var(--accent)] text-[var(--on-accent)]'
                         : 'text-[var(--subtle)] border border-[var(--border)] hover:border-[var(--border-strong)]'
                     }`}
                   >
-                    {cat === 'All' ? t.catalogFilterAll : cat}
+                    {cat === 'All' ? t.catalogFilterAll : (t.categories[cat] ?? cat)}
                   </button>
                 ))}
               </div>
@@ -552,7 +517,7 @@ export default function App() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search APIs by name, category or tag…"
+              placeholder={t.searchPlaceholder}
               className="w-full pl-8 pr-8 py-2 rounded-xl text-xs bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--subtle)] focus:outline-none focus:border-[var(--accent)] transition-colors"
             />
             {search && (
@@ -584,9 +549,9 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 className="col-span-full py-16 text-center"
               >
-                <p className="text-sm text-[var(--subtle)]">No APIs match <span className="text-[var(--ink)]">"{search}"</span></p>
+                <p className="text-sm text-[var(--subtle)]">{fmt(t.searchNoMatch, { q: search })}</p>
                 <button onClick={() => setSearch('')} className="mt-2 text-xs text-[var(--accent)] hover:underline">
-                  Clear search
+                  {t.searchClear}
                 </button>
               </motion.div>
             )}
@@ -602,7 +567,7 @@ export default function App() {
         {/* ── Footer ── */}
         <footer className="mt-16 pt-8 border-t border-[var(--border)] text-center space-y-2">
           <p className="text-xs text-[var(--subtle)]">
-            {t.footerRunning} <span className="text-[var(--ink)]">Arc Testnet</span>
+            {t.footerRunning} <span className="text-[var(--ink)]">{t.heroBadgeNetwork}</span>
             {' · '}{t.footerSettled}{' '}
             <span className="text-[var(--ink)]">Circle Gateway</span>
             {' · '}{t.footerStandard}:{' '}

@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { RefreshCw, Store } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import type { PricedListing, ListingStatus } from '../registry'
+import { useLang } from '../LangContext'
+import { describeError } from '../apiError'
+import { extras, fmt, money } from '../locales'
 
-const STATUS_STYLE: Record<ListingStatus, { dot: string; label: string }> = {
-  healthy: { dot: 'bg-[var(--success)]', label: 'Healthy' },
-  unreachable: { dot: 'bg-[var(--danger)]', label: 'Unreachable' },
-  pending: { dot: 'bg-[var(--subtle)]', label: 'Pending' },
+const STATUS_DOT: Record<ListingStatus, string> = {
+  healthy: 'bg-[var(--success)]',
+  unreachable: 'bg-[var(--danger)]',
+  pending: 'bg-[var(--subtle)]',
 }
 
-const short = (addr: string) => (addr.startsWith('0x') ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr)
+const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`
 
 interface Props {
   listings: PricedListing[]
@@ -19,24 +22,34 @@ interface Props {
 }
 
 export function ListingList({ listings, loading, error, onChanged }: Props) {
+  const { t, lang } = useLang()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+
+  const statusLabel: Record<ListingStatus, string> = {
+    healthy: t.statusHealthy,
+    unreachable: t.statusUnreachable,
+    pending: t.statusPending,
+  }
 
   const recheck = async (id: string) => {
     setBusyId(id)
     setNote(null)
     try {
       const res = await fetch(`/api/registry/${id}/check`, { method: 'POST' })
-      if (!res.ok) {
-        const body = (await res.json()) as { error?: string }
-        setNote(body.error ?? `Check failed (HTTP ${res.status})`)
-      }
+      if (!res.ok) setNote(await describeError(res, t))
       await onChanged()
     } catch {
-      setNote('Could not reach the registry backend')
+      setNote(t.errors.network)
     } finally {
       setBusyId(null)
     }
+  }
+
+  // The operator's own demo listing is stored in English on the server, so its name is localised here.
+  const displayName = (l: PricedListing) => {
+    const tx = l.id === 'demo-summarizer' ? extras[lang].services.summarize : undefined
+    return tx ? `${tx.name} · ${t.listDemoTag}` : l.name
   }
 
   return (
@@ -44,39 +57,34 @@ export function ListingList({ listings, loading, error, onChanged }: Props) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
           <Store size={14} className="text-[var(--accent)]" />
-          <h3 className="display text-sm font-semibold text-[var(--ink)]">Listed sellers</h3>
+          <h3 className="display text-sm font-semibold text-[var(--ink)]">{t.listTitle}</h3>
         </div>
-        <span className="mono text-[11px] text-[var(--subtle)] tabular-nums">{listings.length} listed</span>
+        <span className="text-[11px] text-[var(--subtle)] tabular-nums">{fmt(t.listCount, { n: listings.length })}</span>
       </div>
 
-      {error && (
-        <p className="px-4 py-6 text-xs text-[var(--danger)]">
-          Registry unavailable: {error}. The registry needs the backend server, so it does not run on static hosting.
-        </p>
-      )}
-      {!error && loading && <p className="px-4 py-6 text-xs text-[var(--subtle)]">Loading registry…</p>}
-      {!error && !loading && listings.length === 0 && (
-        <p className="px-4 py-6 text-xs text-[var(--subtle)]">No sellers listed yet. Submit the first one with the form.</p>
-      )}
+      {error && <p className="px-4 py-6 text-xs text-[var(--danger)]">{fmt(t.listUnavailable, { error: t.errors.network })}</p>}
+      {!error && loading && <p className="px-4 py-6 text-xs text-[var(--subtle)]">{t.listLoading}</p>}
+      {!error && !loading && listings.length === 0 && <p className="px-4 py-6 text-xs text-[var(--subtle)]">{t.listEmpty}</p>}
 
       <ul className="divide-y divide-[var(--border)]">
         {listings.map(l => (
           <li key={l.id} className="px-4 py-3 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--ink)] truncate">{l.name}</p>
-                <p className="mono text-[10px] text-[var(--subtle)] truncate">
+                <p className="text-sm font-medium text-[var(--ink)] truncate">{displayName(l)}</p>
+                <p dir="ltr" className="mono text-[10px] text-[var(--subtle)] truncate text-start">
                   {l.method} {l.baseUrl}{l.path}
                 </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLE[l.status].dot}`} />
-                <span className="text-[11px] text-[var(--muted)]">{STATUS_STYLE[l.status].label}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[l.status]}`} />
+                <span className="text-[11px] text-[var(--muted)]">{statusLabel[l.status]}</span>
                 <button
                   onClick={() => { void recheck(l.id) }}
                   disabled={busyId === l.id}
-                  title="Re-check: the endpoint must answer HTTP 402 when called without payment"
-                  className="ml-1 p-1 rounded text-[var(--subtle)] hover:text-[var(--accent)] disabled:opacity-40"
+                  title={t.listRecheckTitle}
+                  aria-label={t.listRecheckTitle}
+                  className="ms-1 p-1 rounded text-[var(--subtle)] hover:text-[var(--accent)] disabled:opacity-40"
                 >
                   <RefreshCw size={11} className={busyId === l.id ? 'animate-spin' : ''} />
                 </button>
@@ -85,22 +93,23 @@ export function ListingList({ listings, loading, error, onChanged }: Props) {
 
             <div className="grid grid-cols-3 gap-2 text-[11px]">
               <div>
-                <p className="text-[var(--subtle)]">Seller gets</p>
-                <p className="mono tabular-nums text-[var(--ink)]">{l.price}</p>
+                <p className="text-[var(--subtle)]">{t.listSellerGets}</p>
+                <p className="tabular-nums text-[var(--ink)]">{money(lang, l.price)}</p>
               </div>
               <div>
-                <p className="text-[var(--subtle)]">Broker fee ({l.feePercent})</p>
-                <p className="mono tabular-nums text-[var(--ink)]">{l.brokerFee}</p>
+                <p className="text-[var(--subtle)]">{fmt(t.listBrokerFee, { pct: l.feePercent })}</p>
+                <p className="tabular-nums text-[var(--ink)]">{money(lang, l.brokerFee)}</p>
               </div>
               <div>
-                <p className="text-[var(--subtle)]">Buyer pays</p>
-                <p className="mono tabular-nums text-[var(--success)] flex items-center gap-1">
-                  <TokenUSDC variant="branded" size={11} />{l.buyerPrice}
+                <p className="text-[var(--subtle)]">{t.listBuyerPays}</p>
+                <p className="tabular-nums text-[var(--success)] flex items-center gap-1">
+                  <TokenUSDC variant="branded" size={11} />{money(lang, l.buyerPrice)}
                 </p>
               </div>
             </div>
             <p className="text-[10px] text-[var(--subtle)]">
-              {l.category} · payout {short(l.payTo)}
+              {t.categories[l.category] ?? l.category} · {t.listPayout}{' '}
+              <span dir="ltr" className="mono">{l.payTo.startsWith('0x') ? short(l.payTo) : t.listNotConfigured}</span>
             </p>
           </li>
         ))}

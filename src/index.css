@@ -19,6 +19,8 @@
   --success: #8dd89f;
   --danger: #e86d7a;
   --header-bg: rgba(13,27,47,0.80);
+  --code-bg: #060f1c;
+  --on-accent: #0d1b2f;
 }
 
 [data-theme="light"] {
@@ -38,6 +40,8 @@
   --success: #16a34a;
   --danger: #dc2626;
   --header-bg: rgba(240,244,250,0.85);
+  --code-bg: #f7f9fc;
+  --on-accent: #ffffff;
 }
 
 * {

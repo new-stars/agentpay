@@ -161,8 +161,13 @@ function mapDiscovery(raw: unknown) {
 // ──────────────────────────────────────────
 export function createRegistryRouter(opts: { demoBaseUrl: string; demoPayTo?: string }) {
   load();
-  if (!listings.some(l => l.id === "demo-summarizer")) {
-    // The operator's own endpoint, so the catalog is never empty. Not a third-party seller.
+  // The operator's own endpoint, so the catalog is never empty. Not a third-party seller.
+  // Re-synced on every start: the payout address and URL come from the current config, not from a stale saved copy.
+  const existing = listings.find(l => l.id === "demo-summarizer");
+  if (existing) {
+    existing.payTo = opts.demoPayTo ?? "not configured";
+    existing.baseUrl = opts.demoBaseUrl;
+  } else {
     listings.push({
       id: "demo-summarizer", name: "AgentPay Demo: Text Summarizer", description: "Operator-hosted demo endpoint on this server.",
       category: "NLP", baseUrl: opts.demoBaseUrl, path: "/pay/summarize", method: "POST", price: "0.001",

@@ -63,6 +63,12 @@ function gate(price: string): express.RequestHandler {
       next();
       return;
     }
+    // A malformed Payment-Signature is a client error: answer 400 instead of letting the gate fail with a 500.
+    const sig = req.get("payment-signature");
+    if (sig !== undefined) {
+      try { JSON.parse(Buffer.from(sig, "base64").toString("utf8")); }
+      catch { res.status(400).json({ error: "Malformed Payment-Signature header" }); return; }
+    }
     return real(req, res, next);
   };
 }

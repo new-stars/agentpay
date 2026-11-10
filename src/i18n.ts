@@ -120,9 +120,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'Agent signs an EIP-3009 off-chain authorisation',
     howStep3Body:
       'The agent parses the payment requirements and signs a transferWithAuthorization (EIP-3009) message from its wallet. Pure cryptographic signature — no on-chain transaction, no gas, no block confirmation required.',
-    howStep4Title: 'Agent retries with the X-Payment header',
+    howStep4Title: 'Agent retries with the Payment-Signature header',
     howStep4Body:
-      'The agent retries with the base64-encoded EIP-3009 signature in the X-Payment header. The Gateway middleware verifies the signature in under a millisecond and immediately returns the paid response.',
+      'The agent retries with the base64-encoded EIP-3009 signature in the Payment-Signature header. The Gateway middleware verifies the signature in under a millisecond and immediately returns the paid response.',
     howStep5Title: 'Circle Gateway batches and settles on-chain',
     howStep5Body:
       'Circle Gateway collects thousands of signed authorisations off-chain and periodically submits a single batched transaction to the USDC contract, settling all payments to the seller\'s wallet.',
@@ -187,9 +187,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'Agent 签署链下 EIP-3009 授权',
     howStep3Body:
       'Agent 解析支付要求，用钱包私钥签署 transferWithAuthorization（EIP-3009）消息。纯密码学签名，无链上交易，无 Gas，无需等待区块确认。',
-    howStep4Title: 'Agent 携带 X-Payment 头重发请求',
+    howStep4Title: 'Agent 携带 Payment-Signature 头重发请求',
     howStep4Body:
-      'Agent 将 Base64 编码的 EIP-3009 签名放入 X-Payment 请求头并重发。Gateway 中间件在不到一毫秒内验证签名，立即返回付费内容。',
+      'Agent 将 Base64 编码的 EIP-3009 签名放入 Payment-Signature 请求头并重发。Gateway 中间件在不到一毫秒内验证签名，立即返回付费内容。',
     howStep5Title: 'Circle Gateway 批量链上结算',
     howStep5Body:
       'Circle Gateway 在链下收集大量签名授权，定期将其打包成一笔链上交易提交至 USDC 合约，将累计款项转入卖家钱包。',
@@ -254,9 +254,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'El agente firma una autorización EIP-3009 fuera de la cadena',
     howStep3Body:
       'El agente analiza los requisitos de pago y firma un mensaje transferWithAuthorization (EIP-3009) desde su billetera. Firma puramente criptográfica — sin transacción en la cadena, sin gas ni confirmación de bloque.',
-    howStep4Title: 'El agente reintenta con la cabecera X-Payment',
+    howStep4Title: 'El agente reintenta con la cabecera Payment-Signature',
     howStep4Body:
-      'El agente reintenta con la firma EIP-3009 codificada en base64 en la cabecera X-Payment. El componente intermedio de Gateway verifica la firma en menos de un milisegundo y devuelve inmediatamente la respuesta pagada.',
+      'El agente reintenta con la firma EIP-3009 codificada en base64 en la cabecera Payment-Signature. El componente intermedio de Gateway verifica la firma en menos de un milisegundo y devuelve inmediatamente la respuesta pagada.',
     howStep5Title: 'Circle Gateway agrupa y liquida en la cadena',
     howStep5Body:
       'Circle Gateway recopila miles de autorizaciones firmadas fuera de la cadena y envía periódicamente una sola transacción agrupada al contrato USDC, transfiriendo los pagos acumulados a la billetera del vendedor.',
@@ -321,9 +321,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: "L'agent signe une autorisation EIP-3009 hors chaîne",
     howStep3Body:
       "L'agent analyse les exigences de paiement et signe un message transferWithAuthorization (EIP-3009) depuis son portefeuille. Signature purement cryptographique — pas de transaction sur la chaîne, pas de frais de gaz, pas de confirmation de bloc.",
-    howStep4Title: "L'agent réessaie avec l'en-tête X-Payment",
+    howStep4Title: "L'agent réessaie avec l'en-tête Payment-Signature",
     howStep4Body:
-      "L'agent réessaie avec la signature EIP-3009 encodée en base64 dans l'en-tête X-Payment. L'intergiciel Gateway vérifie la signature en moins d'une milliseconde et renvoie immédiatement la réponse payante.",
+      "L'agent réessaie avec la signature EIP-3009 encodée en base64 dans l'en-tête Payment-Signature. L'intergiciel Gateway vérifie la signature en moins d'une milliseconde et renvoie immédiatement la réponse payante.",
     howStep5Title: 'Circle Gateway regroupe et règle sur la chaîne',
     howStep5Body:
       'Circle Gateway collecte des milliers d\'autorisations signées hors chaîne et soumet périodiquement une seule transaction groupée au contrat USDC, transférant les paiements accumulés vers le portefeuille du vendeur.',
@@ -388,9 +388,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'Agent signiert eine EIP-3009-Autorisierung außerhalb der Blockchain',
     howStep3Body:
       'Der Agent analysiert die Zahlungsanforderungen und signiert eine transferWithAuthorization (EIP-3009)-Nachricht aus seiner Wallet. Rein kryptografische Signatur — keine Transaktion auf der Blockchain, kein Gas, keine Blockbestätigung erforderlich.',
-    howStep4Title: 'Agent wiederholt die Anfrage mit der X-Payment-Kopfzeile',
+    howStep4Title: 'Agent wiederholt die Anfrage mit der Payment-Signature-Kopfzeile',
     howStep4Body:
-      'Der Agent sendet die Anfrage erneut mit der base64-kodierten EIP-3009-Signatur in der X-Payment-Kopfzeile. Die Gateway-Zwischenschicht überprüft die Signatur in unter einer Millisekunde und gibt sofort die bezahlte Antwort zurück.',
+      'Der Agent sendet die Anfrage erneut mit der base64-kodierten EIP-3009-Signatur in der Payment-Signature-Kopfzeile. Die Gateway-Zwischenschicht überprüft die Signatur in unter einer Millisekunde und gibt sofort die bezahlte Antwort zurück.',
     howStep5Title: 'Circle Gateway bündelt und rechnet auf der Blockchain ab',
     howStep5Body:
       'Circle Gateway sammelt Tausende signierter Autorisierungen außerhalb der Blockchain und sendet periodisch eine einzelne gebündelte Transaktion an den USDC-Vertrag, um alle Zahlungen an die Wallet des Verkäufers zu überweisen.',
@@ -455,9 +455,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'エージェントがオフチェーンEIP-3009署名を行う',
     howStep3Body:
       'エージェントは支払い要件を解析し、ウォレットからtransferWithAuthorization（EIP-3009）メッセージに署名します。純粋な暗号署名で、オンチェーントランザクション不要、ガス不要、ブロック確認不要。',
-    howStep4Title: 'エージェントがX-Paymentヘッダー付きで再試行',
+    howStep4Title: 'エージェントがPayment-Signatureヘッダー付きで再試行',
     howStep4Body:
-      'エージェントはbase64エンコードされたEIP-3009署名をX-Paymentヘッダーに付けて再試行します。Gatewayミドルウェアが1ミリ秒以内に署名を検証し、即座に有料レスポンスを返します。',
+      'エージェントはbase64エンコードされたEIP-3009署名をPayment-Signatureヘッダーに付けて再試行します。Gatewayミドルウェアが1ミリ秒以内に署名を検証し、即座に有料レスポンスを返します。',
     howStep5Title: 'Circle Gatewayがオンチェーンで一括決済',
     howStep5Body:
       'Circle Gatewayはオフチェーンで何千もの署名済み承認を収集し、定期的に単一のバッチトランザクションをUSDCコントラクトに送信して、累積支払いをセラーのウォレットに転送します。',
@@ -522,9 +522,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'يوقّع الوكيل تفويض EIP-3009 خارج السلسلة',
     howStep3Body:
       'يحلل الوكيل متطلبات الدفع ويوقّع رسالة transferWithAuthorization (EIP-3009) من محفظته. توقيع تشفيري بحت — بدون معاملة على السلسلة، بدون غاز، بدون تأكيد كتلة.',
-    howStep4Title: 'يُعيد الوكيل المحاولة مع ترويسة X-Payment',
+    howStep4Title: 'يُعيد الوكيل المحاولة مع ترويسة Payment-Signature',
     howStep4Body:
-      'يُعيد الوكيل المحاولة مع توقيع EIP-3009 المُرمَّز بـ base64 في ترويسة X-Payment. يتحقق وسيط Gateway من التوقيع خلال أقل من ميلي ثانية ويُعيد الاستجابة المدفوعة فوراً.',
+      'يُعيد الوكيل المحاولة مع توقيع EIP-3009 المُرمَّز بـ base64 في ترويسة Payment-Signature. يتحقق وسيط Gateway من التوقيع خلال أقل من ميلي ثانية ويُعيد الاستجابة المدفوعة فوراً.',
     howStep5Title: 'يجمع Circle Gateway المعاملات ويُسوِّيها على السلسلة',
     howStep5Body:
       'يجمع Circle Gateway آلاف التفويضات الموقَّعة خارج السلسلة ويُرسل دورياً معاملة مجمَّعة واحدة إلى عقد USDC، لتحويل المبالغ المتراكمة إلى محفظة البائع.',
@@ -589,9 +589,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: 'O agente assina uma autorização EIP-3009 fora da cadeia',
     howStep3Body:
       'O agente analisa os requisitos de pagamento e assina uma mensagem transferWithAuthorization (EIP-3009) de sua carteira. Assinatura puramente criptográfica — sem transação na cadeia, sem gás, sem confirmação de bloco.',
-    howStep4Title: 'O agente tenta novamente com o cabeçalho X-Payment',
+    howStep4Title: 'O agente tenta novamente com o cabeçalho Payment-Signature',
     howStep4Body:
-      'O agente tenta novamente com a assinatura EIP-3009 codificada em base64 no cabeçalho X-Payment. A camada intermediária do Gateway verifica a assinatura em menos de um milissegundo e retorna imediatamente a resposta paga.',
+      'O agente tenta novamente com a assinatura EIP-3009 codificada em base64 no cabeçalho Payment-Signature. A camada intermediária do Gateway verifica a assinatura em menos de um milissegundo e retorna imediatamente a resposta paga.',
     howStep5Title: 'Circle Gateway agrupa e liquida na cadeia',
     howStep5Body:
       'O Circle Gateway coleta milhares de autorizações assinadas fora da cadeia e envia periodicamente uma única transação em lote ao contrato USDC, transferindo os pagamentos acumulados para a carteira do vendedor.',
@@ -656,9 +656,9 @@ export const translations: Record<LangCode, T> = {
     howStep3Title: '에이전트가 오프체인 EIP-3009 서명 생성',
     howStep3Body:
       '에이전트는 결제 요구사항을 파싱하고 지갑에서 transferWithAuthorization (EIP-3009) 메시지에 서명합니다. 순수한 암호화 서명 — 온체인 트랜잭션, 가스, 블록 확인 불필요.',
-    howStep4Title: '에이전트가 X-Payment 헤더와 함께 재시도',
+    howStep4Title: '에이전트가 Payment-Signature 헤더와 함께 재시도',
     howStep4Body:
-      '에이전트는 X-Payment 헤더에 base64 인코딩된 EIP-3009 서명을 포함하여 재시도합니다. Gateway 미들웨어가 1밀리초 이내에 서명을 검증하고 즉시 유료 응답을 반환합니다.',
+      '에이전트는 Payment-Signature 헤더에 base64 인코딩된 EIP-3009 서명을 포함하여 재시도합니다. Gateway 미들웨어가 1밀리초 이내에 서명을 검증하고 즉시 유료 응답을 반환합니다.',
     howStep5Title: 'Circle Gateway가 온체인 일괄 정산',
     howStep5Body:
       'Circle Gateway는 오프체인에서 수천 개의 서명된 인증을 수집하고 주기적으로 단일 일괄 트랜잭션을 USDC 계약에 제출하여 누적된 결제금을 판매자 지갑으로 전송합니다.',

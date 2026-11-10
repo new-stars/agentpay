@@ -44,3 +44,12 @@ Checks: `bun run check` (lint and typecheck).
 | `RPC_PROXY_BASE_URL`, `RPC_PROXY_TOKEN`, `RPC_PROXY_CHAINS` | Optional. Provisioned by Arc Studio; not needed elsewhere. |
 
 The seller registry is stored in `server/data/registry.json`, which is created at runtime and not committed.
+
+## Try the buyer bot (testnet)
+
+`scripts/buyer-bot.ts` is a small agent that finds a seller in the registry, checks its spending cap, funds its Gateway balance and pays for one call on Arc Testnet.
+It needs `AGENT_PRIVATE_KEY` in `.env`, a throwaway testnet key holding some test USDC. Never use a key that holds real funds.
+
+```
+bun run scripts/buyer-bot.ts
+```

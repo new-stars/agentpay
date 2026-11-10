@@ -13,9 +13,9 @@ const STEP_COLORS = [
 ]
 const STEP_CODES = [
   'POST /pay/summarize  →  (no auth headers)',
-  '← 402  { price: "0.001", network: "ARC-TESTNET", scheme: "gateway-nanopayment" }',
+  '← 402  PAYMENT-REQUIRED: base64({ accepts: [{ amount: "1000", network, payTo: "0x…" }] })',
   'signTypedData(transferWithAuthorization { to: seller, value: 1000, nonce, deadline })',
-  'POST /pay/summarize  X-Payment: base64(signedAuth)  →  200 OK + payload',
+  'POST /pay/summarize  Payment-Signature: base64(signedAuth)  →  200 OK + payload',
   '// N signed authorisations  →  1 batched settlement',
 ]
 

@@ -7,6 +7,7 @@ import {
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
 import { extras, fmt, NUMBER_LOCALE } from '../locales'
+import { readPaymentRequired } from '../paymentRequired'
 import { SessionCostContext } from '../App'
 import { LiveFeedContext } from './LiveFeed'
 
@@ -138,17 +139,21 @@ export function ServiceCard({ service }: { service: AgentService }) {
         headers: { 'Content-Type': 'application/json' },
         ...(service.examplePayload ? { body: JSON.stringify(service.examplePayload) } : {}),
       })
-      const challenge = await unauth.json().catch(() => ({})) as { accepts?: Array<{ network: string; priceUsdc?: string }>; price?: string }
+      const requirement = readPaymentRequired(unauth.headers.get('payment-required'))
       addLog({ type: 'server', text: `←  HTTP ${unauth.status}${unauth.status === 402 ? ' Payment Required' : ''}` })
       if (unauth.status !== 402) {
         addLog({ type: 'error', text: fmt(t.traceHttpFail, { status: unauth.status }) })
         setStatus('error')
         return
       }
-      const net = challenge.accepts?.map(a => a.network).join(', ') ?? 'ARC-TESTNET'
-      addLog({ type: 'info',  text: `   ${t.traceLblPrice}: ${challenge.price ?? service.price} USDC` })
-      addLog({ type: 'info',  text: `   ${t.traceLblNetwork}: ${net}` })
-      addLog({ type: 'info',  text: `   ${t.traceLblScheme}: gateway-nanopayment` })
+      // Only show what the server really sent in its PAYMENT-REQUIRED header.
+      if (requirement) {
+        const shown = requirement.networks.slice(0, 3).join(', ')
+        const more = requirement.networks.length > 3 ? ` +${requirement.networks.length - 3}` : ''
+        addLog({ type: 'info', text: `   ${t.traceLblPrice}: ${requirement.price} USDC` })
+        addLog({ type: 'info', text: `   ${t.traceLblNetwork}: ${shown}${more}` })
+        addLog({ type: 'info', text: `   ${t.traceLblScheme}: ${requirement.scheme}` })
+      }
     } catch {
       // No backend (for example a static host): say so instead of inventing a server reply.
       addLog({ type: 'error', text: t.traceBackendDown })

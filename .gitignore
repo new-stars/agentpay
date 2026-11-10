@@ -42,3 +42,7 @@ Thumbs.db
 
 # Runtime registry data
 server/data/
+
+# Debug logs
+console.jsonl
+traces.jsonl

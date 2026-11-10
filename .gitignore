@@ -39,3 +39,6 @@ contracts/broadcast/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime registry data
+server/data/

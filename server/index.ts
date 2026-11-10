@@ -1,6 +1,7 @@
 import express from "express";
 import { createGatewayMiddleware } from "@circle-fin/x402-batching/server";
 import { formatUnits } from "viem";
+import { createRegistryRouter } from "./registry";
 
 // Extended request type with payment info injected by middleware
 type PaidRequest = express.Request & {
@@ -222,10 +223,18 @@ app.get("/info", (_req, res) => {
   });
 });
 
+// ──────────────────────────────────────────
+// Seller registry + 0.5% broker fee quotes
+// ──────────────────────────────────────────
+const PORT = process.env.PORT || 3001;
+app.use(
+  "/registry",
+  createRegistryRouter({ demoBaseUrl: `http://localhost:${PORT}`, demoPayTo: SELLER_ADDRESS }),
+);
+
 // Health
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`[AgentPay] server running on http://localhost:${PORT}`);
   console.log(`[AgentPay] seller=${SELLER_ADDRESS || "(not set)"}`);

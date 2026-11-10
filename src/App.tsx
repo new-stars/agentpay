@@ -9,6 +9,7 @@ import { StatsBar } from './components/StatsBar'
 import { CodeSnippet } from './components/CodeSnippet'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { LiveFeed } from './components/LiveFeed'
+import { MarketplaceSection } from './components/MarketplaceSection'
 import { useLang } from './LangContext'
 
 // ─────────────────────────────────────────────────────────────
@@ -594,6 +595,9 @@ export default function App() {
         </section>
 
         </LiveFeed>
+
+        {/* ── Seller marketplace: registry, onboarding, buyer lookup ── */}
+        <MarketplaceSection />
 
         {/* ── Footer ── */}
         <footer className="mt-16 pt-8 border-t border-[var(--border)] text-center space-y-2">

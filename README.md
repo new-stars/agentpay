@@ -41,6 +41,8 @@ Checks: `bun run check` (lint and typecheck).
 | `FACILITATOR_URL` | Circle Gateway facilitator URL. Defaults to the testnet facilitator. |
 | `PORT` | Backend port. Defaults to 3001. |
 | `DEMO_MODE` | Defaults to on: a request with the header `X-Demo-Mode: simulate` gets clearly marked sample data and no payment is taken. Set to `off` before putting anything of value behind a route. |
+| `FAST_SETTLE` | Defaults to on: the seller skips Circle's separate verify call and relies on the settle call, which halves payment time. Set to `off` to restore the two-step flow. |
+| `PERF_LOG` | Set to any value to log how long each paid request takes on the server. |
 | `RPC_PROXY_BASE_URL`, `RPC_PROXY_TOKEN`, `RPC_PROXY_CHAINS` | Optional. Provisioned by Arc Studio; not needed elsewhere. |
 
 The seller registry is stored in `server/data/registry.json`, which is created at runtime and not committed.
@@ -53,3 +55,12 @@ It needs `AGENT_PRIVATE_KEY` in `.env`, a throwaway testnet key holding some tes
 ```
 bun run scripts/buyer-bot.ts
 ```
+
+## Payment speed and safety checks (testnet)
+
+```
+bun run scripts/payment-bench.ts     # per-payment timing and a parallel burst
+bun run scripts/payment-attacks.ts   # forged, underpaid, replayed and unfunded payments must all be refused
+```
+
+Both need `AGENT_PRIVATE_KEY` in `.env` and the backend running. Run the second one after any change to the payment gate.

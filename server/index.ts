@@ -43,6 +43,24 @@ const gateway = createGatewayMiddleware({
   facilitatorUrl: FACILITATOR_URL,
 });
 
+// ── Faster settlement ──────────────────────────────────────────
+// By default the gate calls Circle twice in a row: /verify, then /settle (about 120 ms each).
+// /settle checks the whole authorisation again and a call is only served after it succeeds, so the
+// extra /verify round trip is skipped. Obviously broken payloads are still rejected locally first.
+// Set FAST_SETTLE=off to restore the two-step flow.
+const FAST_SETTLE = process.env.FAST_SETTLE !== "off";
+if (FAST_SETTLE) {
+  gateway.onBeforeVerify((ctx) => {
+    const payload = (ctx.paymentPayload as { payload?: { authorization?: { from?: unknown }; signature?: unknown } }).payload;
+    const from = payload?.authorization?.from;
+    if (typeof from !== "string" || typeof payload?.signature !== "string") {
+      return Promise.resolve({ abort: true as const, reason: "malformed_payment" });
+    }
+    return Promise.resolve({ skip: true as const, result: { isValid: true, payer: from } });
+  });
+}
+
+
 // Demo mode lets the website show the full flow without a funded wallet: a request that carries
 // "X-Demo-Mode: simulate" gets clearly-marked SAMPLE data and no payment is taken. Every other
 // request must carry a real payment. Set DEMO_MODE=off before putting anything of value behind a route.
@@ -62,6 +80,10 @@ function gate(price: string): express.RequestHandler {
       res.json = (body?: unknown) => json({ ...(body as object), sample_data: true, demo_mode: true });
       next();
       return;
+    }
+    if (process.env.PERF_LOG) {
+      const t0 = performance.now();
+      res.on("finish", () => console.log(`[perf] ${req.path} ${Math.round(performance.now() - t0)}ms status=${res.statusCode}`));
     }
     // A malformed Payment-Signature is a client error: answer 400 instead of letting the gate fail with a 500.
     const sig = req.get("payment-signature");

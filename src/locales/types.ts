@@ -114,6 +114,22 @@ export interface Extra {
   agentStep3: string // {buyer} {seller} {fee} {pct}
   agentStep4: string // {call}
   // ── errors (server error codes + network) ──
+  rcTitle: string
+  rcIntro: string
+  rcEmpty: string
+  rcNoSeller: string
+  rcError: string
+  rcSummary: string
+  rcMedian: string
+  rcMedianNone: string
+  rcViewTx: string
+  rcFrom: string
+  rcStageReceived: string
+  rcStageBatched: string
+  rcStageConfirmed: string
+  rcStageCompleted: string
+  rcStageFailed: string
+  rcStageUnknown: string
   errors: Record<string, string>
   // ── real sellers from Circle's public discovery ──
   discTitle: string

@@ -6,6 +6,7 @@ import { ListingList } from './ListingList'
 import { SellerForm } from './SellerForm'
 import { BuyerAgentDemo } from './BuyerAgentDemo'
 import { DiscoveryPanel } from './DiscoveryPanel'
+import { SellerReceipts } from './SellerReceipts'
 
 export function MarketplaceSection() {
   const { t } = useLang()
@@ -40,6 +41,7 @@ export function MarketplaceSection() {
       </div>
 
       <div className="space-y-4">
+        <SellerReceipts />
         <DiscoveryPanel />
         <BuyerAgentDemo />
       </div>

@@ -2,6 +2,7 @@ import express from "express";
 import { createGatewayMiddleware } from "@circle-fin/x402-batching/server";
 import { formatUnits } from "viem";
 import { createRegistryRouter } from "./registry";
+import { createPaymentsRouter, recordPayment } from "./payments";
 import { parseUsdc } from "../src/onchain-money";
 
 // Extended request type with payment info injected by middleware
@@ -85,6 +86,12 @@ function gate(price: string): express.RequestHandler {
       const t0 = performance.now();
       res.on("finish", () => console.log(`[perf] ${req.path} ${Math.round(performance.now() - t0)}ms status=${res.statusCode}`));
     }
+    res.on("finish", () => {
+      const pay = (req as PaidRequest).payment;
+      if (pay?.verified && pay.transaction && res.statusCode < 400) {
+        recordPayment({ id: pay.transaction, route: req.path, payer: pay.payer, amountAtomic: pay.amount, network: pay.network });
+      }
+    });
     // A malformed Payment-Signature is a client error: answer 400 instead of letting the gate fail with a 500.
     const sig = req.get("payment-signature");
     if (sig !== undefined) {
@@ -290,6 +297,8 @@ app.use(
   "/registry",
   createRegistryRouter({ demoBaseUrl: `http://localhost:${PORT}`, demoPayTo: SELLER_ADDRESS }),
 );
+
+app.use("/payments", createPaymentsRouter({ seller: SELLER_ADDRESS, facilitatorUrl: FACILITATOR_URL }));
 
 // Health
 app.get("/health", (_req, res) => res.json({ status: "ok" }));

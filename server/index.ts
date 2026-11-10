@@ -2,7 +2,8 @@ import express from "express";
 import { createGatewayMiddleware } from "@circle-fin/x402-batching/server";
 import { formatUnits } from "viem";
 import { createRegistryRouter } from "./registry";
-import { createPaymentsRouter, recordPayment } from "./payments";
+import { createPaymentsRouter, recordRoute } from "./payments";
+import { isServerless, storeKind } from "./store";
 import { parseUsdc } from "../src/onchain-money";
 
 // Extended request type with payment info injected by middleware
@@ -82,6 +83,11 @@ function gate(price: string): express.RequestHandler {
       next();
       return;
     }
+    // Without a payout address the 402 challenge would name the zero address as payee. Refuse to settle anything then.
+    if (!SELLER_ADDRESS && req.get("payment-signature") !== undefined) {
+      res.status(503).json({ error: "Payout address is not configured", code: "seller_not_configured" });
+      return;
+    }
     if (process.env.PERF_LOG) {
       const t0 = performance.now();
       res.on("finish", () => console.log(`[perf] ${req.path} ${Math.round(performance.now() - t0)}ms status=${res.statusCode}`));
@@ -89,7 +95,7 @@ function gate(price: string): express.RequestHandler {
     res.on("finish", () => {
       const pay = (req as PaidRequest).payment;
       if (pay?.verified && pay.transaction && res.statusCode < 400) {
-        recordPayment({ id: pay.transaction, route: req.path, payer: pay.payer, amountAtomic: pay.amount, network: pay.network });
+        recordRoute({ id: pay.transaction, route: req.path });
       }
     });
     // A malformed Payment-Signature is a client error: answer 400 instead of letting the gate fail with a 500.
@@ -293,17 +299,38 @@ app.get("/info", (_req, res) => {
 // Seller registry + 0.5% broker fee quotes
 // ──────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
-app.use(
-  "/registry",
-  createRegistryRouter({ demoBaseUrl: `http://localhost:${PORT}`, demoPayTo: SELLER_ADDRESS }),
-);
 
+/** Where agents reach this server from outside. Comes from configuration only, never from a request header. */
+function publicSiteUrl(): string {
+  const explicit = process.env.PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NETLIFY && process.env.URL) return process.env.URL.replace(/\/$/, "");
+  return `http://localhost:${PORT}`;
+}
+// On a serverless host the API is served under /api; on a normal server it is at the root.
+const API_PREFIX = isServerless ? "/api" : "";
+const registry = createRegistryRouter({
+  demoBaseUrl: publicSiteUrl(),
+  demoPath: `${API_PREFIX}/pay/summarize`,
+  demoPayTo: SELLER_ADDRESS,
+});
+app.use("/registry", registry);
+if (!isServerless) void registry.warm();
 app.use("/payments", createPaymentsRouter({ seller: SELLER_ADDRESS, facilitatorUrl: FACILITATOR_URL }));
 
 // Health
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) =>
+  res.json({ status: "ok", storage: storeKind, sellerConfigured: Boolean(SELLER_ADDRESS), demoMode: DEMO_MODE }),
+);
 
-app.listen(PORT, () => {
-  console.log(`[AgentPay] server running on http://localhost:${PORT}`);
-  console.log(`[AgentPay] seller=${SELLER_ADDRESS || "(not set)"}`);
-});
+// A normal server listens on a port. A serverless host calls the exported app directly.
+if (!isServerless) {
+  app.listen(PORT, () => {
+    console.log(`[AgentPay] server running on http://localhost:${PORT}`);
+    console.log(`[AgentPay] seller=${SELLER_ADDRESS || "(not set)"}`);
+  });
+}
+
+export default app;

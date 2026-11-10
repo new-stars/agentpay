@@ -7,6 +7,7 @@ export type TransferStatus = (typeof STAGES)[number] | 'failed'
 export interface Receipt {
   /** Circle settlement id, from the PAYMENT-RESPONSE header */
   id: string
+  /** Which endpoint was paid; empty when this server did not see the payment */
   route: string
   payer: string
   /** USDC, decimal string */
@@ -29,6 +30,8 @@ export interface ReceiptsResponse {
   totalUsdc: string
   /** Typical seconds from receiving a payment to its final settlement, over recent completed ones */
   medianSecondsToComplete: number | null
+  /** True when Circle returned a full page for some stage, so the counts are a lower bound */
+  truncated: boolean
 }
 
 export const isTerminal = (s: Receipt['status']): boolean => s === 'completed' || s === 'failed'

@@ -1,0 +1,8 @@
+{
+  "framework": "vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/[...path].cjs": { "maxDuration": 30 }
+  }
+}

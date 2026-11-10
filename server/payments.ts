@@ -1,134 +1,139 @@
 /**
- * Ledger of payments this seller has really received, and where each one is in Circle's batch settlement.
- * Circle accepts a payment right away and settles many of them onchain together later, so a seller
- * needs to see "received" and "completed" as two different moments.
+ * Payments received by the seller, read straight from Circle's public transfers endpoint.
+ * Nothing about the payments themselves is stored here, so this works the same on a normal server and on
+ * a serverless host, and survives restarts. The only thing kept locally is which route each payment paid for
+ * (Circle does not know that), and losing it just hides the route label.
  */
 import express from "express";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { formatUsdc } from "../src/onchain-money";
-import { buildTxExplorerUrl } from "../src/onchain-facts";
-import { isTerminal, type Receipt, type ReceiptsResponse, type TransferStatus } from "../src/receipts";
+import { getChain, buildTxExplorerUrl } from "../src/onchain-facts";
+import { isTerminal, STAGES, type Receipt, type ReceiptsResponse, type TransferStatus } from "../src/receipts";
+import { loadJson, saveJson } from "./store";
 
-const DATA_DIR = new URL("./data/", import.meta.url).pathname;
-const DATA_FILE = `${DATA_DIR}payments.json`;
-const MAX_ENTRIES = 300;
-const RECHECK_MS = 10_000;
-const MAX_CHECKS_PER_REQUEST = 25;
-const CHAIN_ID = 5042002; // Arc Testnet, where this seller is paid
+const ALL_STATUSES: TransferStatus[] = [...STAGES, "failed"];
+const PAGE = 50;
+const CACHE_MS = 5_000;
+const MAX_ROUTES = 500;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const VALID: ReadonlySet<string> = new Set(["received", "batched", "confirmed", "completed", "failed"]);
 
-interface Entry extends Omit<Receipt, "explorerUrl"> {
-  checkedAt: number;
+interface CircleTransfer {
+  id: string;
+  status: string;
+  fromAddress: string;
+  amount: string;
+  sendingNetwork: string;
+  txHash?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-let ledger: Entry[] = [];
+// ── route labels (best effort) ──────────────────────────────
+let routes = new Map<string, string>();
+let routesLoaded = false;
 
-function load(): void {
-  try {
-    if (existsSync(DATA_FILE)) ledger = JSON.parse(readFileSync(DATA_FILE, "utf8")) as Entry[];
-  } catch {
-    ledger = [];
-  }
+async function loadRoutes() {
+  if (routesLoaded) return;
+  routesLoaded = true;
+  const saved = await loadJson<Array<[string, string]>>("payment-routes");
+  if (saved) routes = new Map([...saved, ...routes]);
 }
 
-function save(): void {
-  try {
-    mkdirSync(DATA_DIR, { recursive: true });
-    const tmp = `${DATA_FILE}.tmp`;
-    writeFileSync(tmp, JSON.stringify(ledger));
-    renameSync(tmp, DATA_FILE);
-  } catch (e) {
-    console.warn("[AgentPay] could not save payments ledger:", (e as Error).message);
-  }
+/** Remember which route a settled payment paid for. Called once per successful paid request. */
+export function recordRoute(entry: { id: string; route: string }): void {
+  if (!UUID.test(entry.id)) return;
+  routes.set(entry.id, entry.route.slice(0, 80));
+  while (routes.size > MAX_ROUTES) routes.delete(routes.keys().next().value as string);
+  void saveJson("payment-routes", [...routes]);
 }
 
-export function recordPayment(p: { id: string; route: string; payer: string; amountAtomic: string; network: string }): void {
-  if (!UUID.test(p.id) || ledger.some(e => e.id === p.id)) return;
-  let amount = "0";
-  try {
-    amount = formatUsdc(BigInt(p.amountAtomic));
-  } catch {
-    // Keep the receipt even if the amount cannot be formatted.
-  }
-  ledger.unshift({
-    id: p.id, route: p.route, payer: p.payer, amount, network: p.network,
-    receivedAt: new Date().toISOString(), status: "unknown", txHash: null, completedAt: null, checkedAt: 0,
+// ── Circle ──────────────────────────────────────────────────
+async function fetchByStatus(base: string, seller: string, network: string, status: TransferStatus): Promise<CircleTransfer[]> {
+  const qs = new URLSearchParams({ to: seller, network, status, pageSize: String(PAGE) });
+  const res = await fetch(`${base}/v1/x402/transfers?${qs}`, {
+    headers: { Accept: "application/json", "User-Agent": "agentpay/1.0" },
+    signal: AbortSignal.timeout(6_000),
   });
-  if (ledger.length > MAX_ENTRIES) ledger.length = MAX_ENTRIES;
-  save();
+  if (!res.ok) throw new Error(`Circle transfers HTTP ${res.status}`);
+  return ((await res.json()) as { transfers?: CircleTransfer[] }).transfers ?? [];
 }
 
-async function checkOne(facilitatorUrl: string, e: Entry): Promise<void> {
-  try {
-    const res = await fetch(`${facilitatorUrl}/v1/x402/transfers/${encodeURIComponent(e.id)}`, {
-      headers: { Accept: "application/json", "User-Agent": "agentpay/1.0" },
-      signal: AbortSignal.timeout(6000),
-    });
-    e.checkedAt = Date.now();
-    if (!res.ok) return;
-    const t = (await res.json()) as { status?: string; txHash?: string | null; updatedAt?: string };
-    if (t.status && VALID.has(t.status)) e.status = t.status as TransferStatus;
-    if (typeof t.txHash === "string" && /^0x[0-9a-fA-F]{64}$/.test(t.txHash)) e.txHash = t.txHash;
-    if (e.status === "completed" && t.updatedAt) e.completedAt = t.updatedAt;
-  } catch {
-    // Circle's status endpoint is best effort: keep the last known status and try again later.
-  }
-}
+const emptyCounts = (): ReceiptsResponse["counts"] => ({ received: 0, batched: 0, confirmed: 0, completed: 0, failed: 0, unknown: 0 });
 
-let inFlight: Promise<void> | null = null;
-
-/** Re-check payments that are not final yet. Concurrent requests share one round of checks. */
-function refresh(facilitatorUrl: string): Promise<void> {
-  inFlight ??= (async () => {
-    const due = ledger.filter(e => !isTerminal(e.status) && Date.now() - e.checkedAt > RECHECK_MS).slice(0, MAX_CHECKS_PER_REQUEST);
-    if (due.length === 0) return;
-    await Promise.all(due.map(e => checkOne(facilitatorUrl, e)));
-    save();
-  })().finally(() => { inFlight = null; });
-  return inFlight;
-}
-
-function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)] ?? null;
+function toReceipt(t: CircleTransfer, explorerChainId: number | null): Receipt | null {
+  if (!/^\d{1,18}$/.test(t.amount) || typeof t.id !== "string") return null;
+  const status = (ALL_STATUSES as string[]).includes(t.status) ? (t.status as TransferStatus) : "unknown";
+  const txHash = typeof t.txHash === "string" && /^0x[0-9a-fA-F]{64}$/.test(t.txHash) ? t.txHash : null;
+  return {
+    id: t.id,
+    route: routes.get(t.id) ?? "",
+    payer: t.fromAddress,
+    amount: formatUsdc(BigInt(t.amount)),
+    network: t.sendingNetwork,
+    receivedAt: t.createdAt,
+    status,
+    txHash,
+    completedAt: status === "completed" ? t.updatedAt : null,
+    explorerUrl: txHash && explorerChainId ? buildTxExplorerUrl(explorerChainId, txHash) : null,
+  };
 }
 
 export function createPaymentsRouter(opts: { seller?: string; facilitatorUrl: string }) {
-  load();
   const router = express.Router();
+  const network = process.env.PAYMENTS_NETWORK ?? "eip155:5042002";
+  const chainId = Number(network.split(":")[1]);
+  const explorerChainId = Number.isInteger(chainId) && getChain(chainId) ? chainId : null;
+  let cache: { at: number; body: ReceiptsResponse } | undefined;
 
   router.get("/", async (_req, res) => {
-    await refresh(opts.facilitatorUrl);
-
-    const receipts: Receipt[] = ledger.slice(0, 50).map(e => ({
-      id: e.id, route: e.route, payer: e.payer, amount: e.amount, network: e.network, receivedAt: e.receivedAt,
-      status: e.status, txHash: e.txHash, completedAt: e.completedAt,
-      explorerUrl: e.txHash ? buildTxExplorerUrl(CHAIN_ID, e.txHash) : null,
-    }));
-
-    const counts: ReceiptsResponse["counts"] = { received: 0, batched: 0, confirmed: 0, completed: 0, failed: 0, unknown: 0 };
-    let totalAtomic = 0n;
-    for (const e of ledger) {
-      counts[e.status]++;
-      try { totalAtomic += BigInt(Math.round(Number(e.amount) * 1e6)); } catch { /* skip an unreadable amount */ }
+    const seller = opts.seller;
+    if (!seller) {
+      res.json({ seller: null, receipts: [], counts: emptyCounts(), totalUsdc: "0", medianSecondsToComplete: null, truncated: false } satisfies ReceiptsResponse);
+      return;
     }
-    const lags = ledger
-      .filter(e => e.status === "completed" && e.completedAt)
-      .slice(0, 50)
-      .map(e => (Date.parse(e.completedAt as string) - Date.parse(e.receivedAt)) / 1000)
-      .filter(n => Number.isFinite(n) && n >= 0);
+    if (cache && Date.now() - cache.at < CACHE_MS) { res.json(cache.body); return; }
+
+    await loadRoutes();
+    const settled = await Promise.allSettled(ALL_STATUSES.map(s => fetchByStatus(opts.facilitatorUrl, seller, network, s)));
+    if (settled.every(r => r.status === "rejected")) {
+      if (cache) { res.json(cache.body); return; } // stale is better than nothing
+      res.status(502).json({ error: "Circle is unavailable", code: "payments" });
+      return;
+    }
+    const all: Receipt[] = [];
+    let truncated = false;
+    for (const r of settled) {
+      if (r.status !== "fulfilled") continue;
+      if (r.value.length >= PAGE) truncated = true;
+      for (const t of r.value) {
+        const receipt = toReceipt(t, explorerChainId);
+        if (receipt) all.push(receipt);
+      }
+    }
+    all.sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt));
+
+    const counts = emptyCounts();
+    let totalAtomic = 0n;
+    const lags: number[] = [];
+    for (const r of all) {
+      counts[r.status]++;
+      totalAtomic += BigInt(Math.round(Number(r.amount) * 1e6));
+      if (r.completedAt) lags.push((Date.parse(r.completedAt) - Date.parse(r.receivedAt)) / 1000);
+    }
+    lags.sort((a, b) => a - b);
 
     const body: ReceiptsResponse = {
-      seller: opts.seller ?? null,
-      receipts,
+      seller,
+      receipts: all.slice(0, PAGE),
       counts,
       totalUsdc: formatUsdc(totalAtomic),
-      medianSecondsToComplete: median(lags),
+      medianSecondsToComplete: lags.length ? Math.round(lags[Math.floor(lags.length / 2)] as number) : null,
+      truncated,
     };
+    cache = { at: Date.now(), body };
     res.json(body);
   });
 
   return router;
 }
+
+export { isTerminal };

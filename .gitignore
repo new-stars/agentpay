@@ -46,3 +46,7 @@ server/data/
 # Debug logs
 console.jsonl
 traces.jsonl
+
+# Platform folders
+.vercel/
+.netlify/

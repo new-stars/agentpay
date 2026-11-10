@@ -1,39 +1,24 @@
 import express from "express";
 import { promises as dns } from "node:dns";
 import { isIP } from "node:net";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { withQuote, BROKER_FEE_BPS, type Listing, type ListingStatus } from "../src/registry";
 import { formatUsdc } from "../src/onchain-money";
+import { isServerless, loadJson, saveJson } from "./store";
 
-const DATA_DIR = new URL("./data/", import.meta.url).pathname;
-const DATA_FILE = `${DATA_DIR}registry.json`;
 const MAX_LISTINGS = 200;
 const CATEGORIES = ["NLP", "Data", "DeFi", "Compliance", "Dev Tools", "Other"];
 const PROBE_TIMEOUT_MS = 5_000;
 const RECHECK_MIN_INTERVAL_MS = 10_000;
+const STALE_AFTER_MS = 10 * 60_000;
 
-// ──────────────────────────────────────────
-// Storage (JSON file, atomic write)
+// Storage (see ./store.ts: file, Redis over HTTPS, or memory)
 // ──────────────────────────────────────────
 let listings: Listing[] = [];
 /** Listings the operator seeded themselves (may point at localhost). Never user-submittable. */
 const trusted = new Set<string>();
 
-function load() {
-  try {
-    if (existsSync(DATA_FILE)) listings = JSON.parse(readFileSync(DATA_FILE, "utf8")) as Listing[];
-  } catch (err) {
-    console.warn("[Registry] could not read registry.json, starting empty:", err);
-    listings = [];
-  }
-}
-function save() {
-  mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = `${DATA_FILE}.tmp`;
-  writeFileSync(tmp, JSON.stringify(listings, null, 2));
-  renameSync(tmp, DATA_FILE);
-}
+const save = (): Promise<void> => saveJson("registry", listings);
 
 // ──────────────────────────────────────────
 // SSRF guard: sellers submit URLs the server will call
@@ -159,25 +144,59 @@ function mapDiscovery(raw: unknown) {
 // ──────────────────────────────────────────
 // Router
 // ──────────────────────────────────────────
-export function createRegistryRouter(opts: { demoBaseUrl: string; demoPayTo?: string }) {
-  load();
-  // The operator's own endpoint, so the catalog is never empty. Not a third-party seller.
-  // Re-synced on every start: the payout address and URL come from the current config, not from a stale saved copy.
-  const existing = listings.find(l => l.id === "demo-summarizer");
-  if (existing) {
-    existing.payTo = opts.demoPayTo ?? "not configured";
-    existing.baseUrl = opts.demoBaseUrl;
-  } else {
-    listings.push({
-      id: "demo-summarizer", name: "AgentPay Demo: Text Summarizer", description: "Operator-hosted demo endpoint on this server.",
-      category: "NLP", baseUrl: opts.demoBaseUrl, path: "/pay/summarize", method: "POST", price: "0.001",
-      payTo: opts.demoPayTo ?? "not configured", status: "pending", lastCheckedAt: null, createdAt: new Date().toISOString(),
-    });
+export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: string; demoPayTo?: string }) {
+  let ready: Promise<void> | undefined;
+
+  /** Runs once per server or serverless instance: load saved listings, then (re)seed the operator's own one. */
+  const init = (): Promise<void> => {
+    ready ??= (async () => {
+      listings = (await loadJson<Listing[]>("registry")) ?? [];
+      // The operator's own endpoint, so the catalog is never empty. Not a third-party seller.
+      // Re-synced on every start: the payout address and URL come from the current config, not from a saved copy.
+      // The URL comes from trusted configuration only, never from a request header.
+      const existing = listings.find(l => l.id === "demo-summarizer");
+      if (existing) {
+        existing.payTo = opts.demoPayTo ?? "not configured";
+        existing.baseUrl = opts.demoBaseUrl;
+        existing.path = opts.demoPath;
+      } else {
+        listings.push({
+          id: "demo-summarizer", name: "AgentPay Demo: Text Summarizer", description: "Operator-hosted demo endpoint on this server.",
+          category: "NLP", baseUrl: opts.demoBaseUrl, path: opts.demoPath, method: "POST", price: "0.001",
+          payTo: opts.demoPayTo ?? "not configured", status: "pending", lastCheckedAt: null, createdAt: new Date().toISOString(),
+        });
+      }
+      trusted.add("demo-summarizer");
+      await refreshStale(isServerless ? 5 : MAX_LISTINGS);
+    })();
+    return ready;
+  };
+
+  /** Health-check listings nobody has looked at for a while. Bounded, so one request never fans out far. */
+  async function refreshStale(max: number): Promise<void> {
+    const now = Date.now();
+    const due = listings
+      .filter(l => !l.lastCheckedAt || now - Date.parse(l.lastCheckedAt) > STALE_AFTER_MS)
+      .slice(0, max);
+    if (due.length === 0) return;
+    await Promise.all(due.map(async l => {
+      // On a serverless host the operator's own endpoint is this very function: do not call ourselves over HTTP.
+      l.status = isServerless && l.id === "demo-summarizer"
+        ? (opts.demoPayTo ? "healthy" : "unreachable")
+        : await probe(l);
+      l.lastCheckedAt = new Date().toISOString();
+    }));
+    await save();
   }
-  trusted.add("demo-summarizer");
-  void Promise.all(listings.map(async l => { l.status = await probe(l); l.lastCheckedAt = new Date().toISOString(); })).then(save);
 
   const router = express.Router();
+
+  router.use((req, _res, next) => {
+    const work = req.path.startsWith("/discover")
+      ? init()
+      : init().then(() => (req.method === "GET" && isServerless ? refreshStale(5) : undefined));
+    work.then(() => next(), next);
+  });
 
   // Machine-readable catalog. Agents call this to discover supply.
   router.get("/", (req, res) => {
@@ -221,7 +240,7 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPayTo?: st
     listing.status = await probe(listing);
     listing.lastCheckedAt = new Date().toISOString();
     listings.push(listing);
-    save();
+    await save();
     res.status(201).json(withQuote(listing));
   });
 
@@ -233,7 +252,7 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPayTo?: st
     }
     l.status = await probe(l);
     l.lastCheckedAt = new Date().toISOString();
-    save();
+    await save();
     res.json(withQuote(l));
   });
 
@@ -261,5 +280,5 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPayTo?: st
     }
   });
 
-  return router;
+  return Object.assign(router, { warm: init });
 }

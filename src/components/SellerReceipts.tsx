@@ -67,7 +67,7 @@ export function SellerReceipts() {
         <h3 className="display text-sm font-semibold text-[var(--ink)]">{t.rcTitle}</h3>
         {data && total > 0 && (
           <span className="ms-auto text-[11px] text-[var(--subtle)]">
-            {fmt(t.rcSummary, { n: Object.values(data.counts).reduce((a, b) => a + b, 0), amount: money(lang, data.totalUsdc) })}
+            {fmt(t.rcSummary, { n: `${Object.values(data.counts).reduce((a, b) => a + b, 0)}${data.truncated ? '+' : ''}`, amount: money(lang, data.totalUsdc) })}
           </span>
         )}
       </div>
@@ -97,7 +97,7 @@ export function SellerReceipts() {
               <li key={r.id} className="py-2 flex items-center gap-3 text-xs">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="mono text-[var(--ink)]" dir="ltr">{r.route}</span>
+                    {r.route && <span className="mono text-[var(--ink)]" dir="ltr">{r.route}</span>}
                     <span className="mono text-[var(--ink)]">{money(lang, r.amount)} USDC</span>
                   </div>
                   <div className="text-[10px] text-[var(--subtle)] truncate">

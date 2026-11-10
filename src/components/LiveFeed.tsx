@@ -3,10 +3,10 @@
  * Calls the visitor makes with "Simulate" are pushed in via LiveFeedContext and shown at the top.
  */
 import React, { useEffect, useRef, useState, createContext } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Zap } from 'lucide-react'
 import { useLang } from '../LangContext'
-import { extras, fmt } from '../locales'
+import { fmt } from '../locales'
 
 // Events store the service id, so the name is rendered in the language active at display time.
 interface FeedEvent {
@@ -48,7 +48,7 @@ function makeEvent(): FeedEvent {
 const MAX = 18
 
 export function LiveFeed({ children }: { children?: React.ReactNode }) {
-  const { t, lang } = useLang()
+  const { t } = useLang()
   const [events, setEvents] = useState<FeedEvent[]>(() => Array.from({ length: 6 }, makeEvent))
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -75,7 +75,7 @@ export function LiveFeed({ children }: { children?: React.ReactNode }) {
   }
 
   const nameOf = (id: string) =>
-    extras[lang].services[id]?.name ?? SAMPLE_SERVICES.find(s => s.id === id)?.name ?? id
+    t.services[id]?.name ?? SAMPLE_SERVICES.find(s => s.id === id)?.name ?? id
 
   return (
     <LiveFeedContext.Provider value={{ push: pushReal }}>
@@ -103,7 +103,7 @@ export function LiveFeed({ children }: { children?: React.ReactNode }) {
           <div className="divide-y divide-[var(--border)] max-h-56 overflow-y-auto">
             <AnimatePresence initial={false}>
               {events.map(ev => (
-                <motion.div
+                <m.div
                   key={ev.id}
                   initial={{ opacity: 0, y: -8, backgroundColor: 'rgba(172,198,233,0.12)' }}
                   animate={{ opacity: 1, y: 0, backgroundColor: 'rgba(172,198,233,0)' }}
@@ -120,7 +120,7 @@ export function LiveFeed({ children }: { children?: React.ReactNode }) {
                   <div className="flex items-center justify-end gap-0.5 w-16">
                     <span className="mono text-[11px] font-semibold text-[var(--success)] tabular-nums">{ev.price}</span>
                   </div>
-                </motion.div>
+                </m.div>
               ))}
             </AnimatePresence>
           </div>

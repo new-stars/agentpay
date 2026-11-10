@@ -1,12 +1,12 @@
 import { useState, useRef, useContext } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import {
   Zap, CheckCircle, XCircle, Loader2, Terminal,
   ChevronDown, ChevronUp, Code2, Lightbulb, Clock, Shield, Fuel, Copy, Check,
 } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
-import { extras, fmt, NUMBER_LOCALE } from '../locales'
+import { fmt, NUMBER_LOCALE } from '../locales'
 import { readPaymentRequired } from '../paymentRequired'
 import { SessionCostContext } from '../App'
 import { LiveFeedContext } from './LiveFeed'
@@ -67,7 +67,7 @@ function SchemaTable({ schema, title, serviceId }: { schema: Record<string, stri
   const { lang, t } = useLang()
   const entries = Object.entries(schema)
   if (entries.length === 0) return <p className="text-[11px] text-[var(--subtle)] italic">{t.cardNoParams}</p>
-  const tx = extras[lang].services[serviceId]
+  const tx = t.services[serviceId]
   return (
     <div>
       <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--subtle)] mb-1.5">{title}</div>
@@ -96,7 +96,7 @@ function SchemaTable({ schema, title, serviceId }: { schema: Record<string, stri
 // ──────────────────────────────────────────
 export function ServiceCard({ service }: { service: AgentService }) {
   const { t, lang } = useLang()
-  const tx = extras[lang].services[service.id]
+  const tx = t.services[service.id]
   const slaPct = new Intl.NumberFormat(NUMBER_LOCALE[lang], { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(parseFloat(service.sla))
   const { add: addSessionCost } = useContext(SessionCostContext)
   const { push: pushFeed } = useContext(LiveFeedContext)
@@ -131,7 +131,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
     addLog({ type: 'info',  text: t.traceSimNote })
     addLog({ type: 'agent', text: `→  ${service.method} ${service.endpoint}` })
     addLog({ type: 'info',  text: `   ${t.traceNoCreds}` })
-    await sleep(600)
+    await sleep(150)
 
     try {
       const unauth = await fetch(`/api${service.endpoint}`, {
@@ -163,21 +163,21 @@ export function ServiceCard({ service }: { service: AgentService }) {
 
     // ── Step 2: negotiate ──
     setStatus('negotiating')
-    await sleep(450)
+    await sleep(112)
     addLog({ type: 'agent', text: `   ${t.traceParsing}` })
-    await sleep(400)
+    await sleep(100)
     addLog({ type: 'agent', text: `   ${t.traceBuilding}` })
-    await sleep(300)
+    await sleep(75)
     addLog({ type: 'agent', text: `   ${t.traceSigning}` })
-    await sleep(500)
+    await sleep(125)
     addLog({ type: 'info',  text: `   ${t.traceSignatureSim}` })
 
     // ── Step 3: paid retry ──
     setStatus('paying')
-    await sleep(300)
+    await sleep(75)
     addLog({ type: 'agent', text: `→  ${service.method} ${service.endpoint}` })
     addLog({ type: 'info',  text: '   X-Demo-Mode: simulate' })
-    await sleep(650)
+    await sleep(162)
 
     try {
       const paid = await fetch(`/api${service.endpoint}`, {
@@ -227,7 +227,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
   const isRunning = status === 'detecting' || status === 'negotiating' || status === 'paying'
 
   return (
-    <motion.div
+    <m.div
       ref={cardRef}
       layout
       className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] backdrop-blur-md overflow-hidden h-full"
@@ -244,14 +244,14 @@ export function ServiceCard({ service }: { service: AgentService }) {
             <span key={tag} className="text-[10px] text-[var(--subtle)]/70">#{tag}</span>
           ))}
           {callCount > 0 && (
-            <motion.span
+            <m.span
               key={callCount}
               initial={{ scale: 1.3, opacity: 0 }}
               animate={{ scale: 1,   opacity: 1 }}
               className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/25"
             >
               {fmt(t.cardCalled, { n: callCount })}
-            </motion.span>
+            </m.span>
           )}
         </div>
 
@@ -340,7 +340,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
         {/* Gas-saved callout — shown only after a successful simulation */}
         <AnimatePresence>
           {status === 'success' && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
@@ -351,7 +351,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
               <span className="text-[11px] text-[var(--success)] font-medium">
                 {t.cardGasSaved}
               </span>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
@@ -382,7 +382,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
       {/* ── Expandable panels ── */}
       <AnimatePresence initial={false}>
         {activeTab === 'trace' && (
-          <motion.div
+          <m.div
             key="trace"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -423,11 +423,11 @@ export function ServiceCard({ service }: { service: AgentService }) {
                 </div>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
 
         {activeTab === 'schema' && (
-          <motion.div
+          <m.div
             key="schema"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -449,11 +449,11 @@ export function ServiceCard({ service }: { service: AgentService }) {
                 </div>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
 
         {activeTab === 'uses' && (
-          <motion.div
+          <m.div
             key="uses"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -474,10 +474,10 @@ export function ServiceCard({ service }: { service: AgentService }) {
                 ))}
               </ul>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </m.div>
   )
 }
 

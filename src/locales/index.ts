@@ -1,18 +1,26 @@
 import type { LangCode } from '../i18n'
 import type { Extra } from './types'
 import { en } from './en'
-import { zh } from './zh'
-import { es } from './es'
-import { fr } from './fr'
-import { de } from './de'
-import { ja } from './ja'
-import { ar } from './ar'
-import { pt } from './pt'
-import { ko } from './ko'
 
 export type { Extra, ServiceText } from './types'
+export { en }
 
-export const extras: Record<LangCode, Extra> = { en, zh, es, fr, de, ja, ar, pt, ko }
+/** Each language is its own chunk and is fetched only when the visitor picks it. English ships with the app. */
+const loaders: Record<Exclude<LangCode, 'en'>, () => Promise<Extra>> = {
+  zh: () => import('./zh').then(m => m.zh),
+  es: () => import('./es').then(m => m.es),
+  fr: () => import('./fr').then(m => m.fr),
+  de: () => import('./de').then(m => m.de),
+  ja: () => import('./ja').then(m => m.ja),
+  ar: () => import('./ar').then(m => m.ar),
+  pt: () => import('./pt').then(m => m.pt),
+  ko: () => import('./ko').then(m => m.ko),
+}
+
+export async function loadExtra(lang: LangCode): Promise<Extra> {
+  if (lang === 'en') return en
+  return loaders[lang]()
+}
 
 /** Fill `{name}` placeholders. Unknown placeholders are left visible so a typo is easy to spot. */
 export function fmt(template: string, vars: Record<string, string | number>): string {

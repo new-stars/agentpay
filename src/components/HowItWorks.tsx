@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { Bot, Zap, Key, RotateCcw, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useLang } from '../LangContext'
 
@@ -51,7 +51,7 @@ export function HowItWorks() {
       </button>
 
       <AnimatePresence initial={false}>
-      {open && <motion.div
+      {open && <m.div
         key="how-body"
         initial={{ height: 0, opacity: 0 }}
         animate={{ height: 'auto', opacity: 1 }}
@@ -66,7 +66,7 @@ export function HowItWorks() {
           const Icon = STEP_ICONS[i]
           const c = STEP_COLORS[i]
           return (
-            <motion.div
+            <m.div
               key={step.num}
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -94,7 +94,7 @@ export function HowItWorks() {
                   <code className="mono text-[10px] text-[var(--accent)] break-all">{STEP_CODES[i]}</code>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           )
         })}
       </div>
@@ -116,7 +116,7 @@ export function HowItWorks() {
         ))}
       </div>
       </div>{/* /pt-4 */}
-      </motion.div>}
+      </m.div>}
       </AnimatePresence>
     </section>
   )

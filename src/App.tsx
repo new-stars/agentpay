@@ -1,17 +1,31 @@
-import React, { useState, useEffect } from 'react'
-import { ConnectKitButton } from 'connectkit'
-import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X, Sun, Moon } from 'lucide-react'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
+import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X, Sun, Moon, Wallet } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { ServiceCard, type AgentService } from './components/ServiceCard'
-import { HowItWorks } from './components/HowItWorks'
 import { StatsBar } from './components/StatsBar'
-import { CodeSnippet } from './components/CodeSnippet'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { LiveFeed } from './components/LiveFeed'
-import { MarketplaceSection } from './components/MarketplaceSection'
+import { InView } from './components/InView'
 import { useLang } from './LangContext'
-import { extras, fmt, NUMBER_LOCALE } from './locales'
+import { fmt, NUMBER_LOCALE } from './locales'
+
+const WalletButton = lazy(() => import('./components/WalletButton'))
+const HowItWorks = lazy(() => import('./components/HowItWorks').then(m => ({ default: m.HowItWorks })))
+const CodeSnippet = lazy(() => import('./components/CodeSnippet').then(m => ({ default: m.CodeSnippet })))
+const MarketplaceSection = lazy(() => import('./components/MarketplaceSection').then(m => ({ default: m.MarketplaceSection })))
+
+/** Same footprint as the wallet button, so the header does not jump while it loads. */
+function WalletPlaceholder() {
+  return (
+    <span
+      aria-busy="true"
+      className="inline-flex h-8 w-24 items-center justify-center rounded-lg border border-[var(--border)] text-[var(--subtle)] animate-pulse"
+    >
+      <Wallet size={14} />
+    </span>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────
 // Service catalog (static — names/descriptions stay English)
@@ -345,7 +359,7 @@ export default function App() {
   const filtered = SERVICES.filter(s => {
     const matchCat = activeCategory === 'All' || s.category === activeCategory
     const q = search.toLowerCase().trim()
-    const tx = extras[lang].services[s.id]
+    const tx = t.services[s.id]
     const matchSearch = q === '' ||
       s.name.toLowerCase().includes(q) ||
       (tx?.name ?? '').toLowerCase().includes(q) ||
@@ -403,7 +417,9 @@ export default function App() {
             </button>
             {/* ── Language switcher ── */}
             <LanguageSwitcher />
-            <ConnectKitButton />
+            <Suspense fallback={<WalletPlaceholder />}>
+              <WalletButton />
+            </Suspense>
           </div>
         </div>
       </header>
@@ -412,7 +428,7 @@ export default function App() {
 
         {/* ── Hero ── */}
         <section className="mb-12">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <m.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
 
             {/* Protocol badges */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -462,23 +478,23 @@ export default function App() {
 
             {/* Code snippet drawer */}
             {showSnippet && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-4 overflow-hidden"
               >
-                <CodeSnippet />
-              </motion.div>
+                <Suspense fallback={null}><CodeSnippet /></Suspense>
+              </m.div>
             )}
-          </motion.div>
+          </m.div>
         </section>
 
         {/* ── Stats bar ── */}
         <StatsBar serviceCount={SERVICES.length} />
 
         {/* ── How it works ── */}
-        <HowItWorks />
+        <Suspense fallback={null}><HowItWorks /></Suspense>
 
         {/* ── Live feed + catalog wrapped in LiveFeedContext ── */}
         <LiveFeed>
@@ -531,9 +547,9 @@ export default function App() {
           </div>
 
           <SessionCostContext.Provider value={{ add: addCost }}>
-          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <m.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((svc, i) => (
-              <motion.div
+              <m.div
                 key={svc.id}
                 layout
                 initial={{ opacity: 0, y: 12 }}
@@ -541,10 +557,10 @@ export default function App() {
                 transition={{ delay: i * 0.05 }}
               >
                 <ServiceCard service={svc} />
-              </motion.div>
+              </m.div>
             ))}
             {filtered.length === 0 && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="col-span-full py-16 text-center"
@@ -553,16 +569,18 @@ export default function App() {
                 <button onClick={() => setSearch('')} className="mt-2 text-xs text-[var(--accent)] hover:underline">
                   {t.searchClear}
                 </button>
-              </motion.div>
+              </m.div>
             )}
-          </motion.div>
+          </m.div>
           </SessionCostContext.Provider>
         </section>
 
         </LiveFeed>
 
         {/* ── Seller marketplace: registry, onboarding, buyer lookup ── */}
-        <MarketplaceSection />
+        <InView minHeight={480}>
+          <Suspense fallback={null}><MarketplaceSection /></Suspense>
+        </InView>
 
         {/* ── Footer ── */}
         <footer className="mt-16 pt-8 border-t border-[var(--border)] text-center space-y-2">

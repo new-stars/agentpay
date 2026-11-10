@@ -4,7 +4,7 @@ import { TokenUSDC } from '@web3icons/react'
 import type { PricedListing, ListingStatus } from '../registry'
 import { useLang } from '../LangContext'
 import { describeError } from '../apiError'
-import { extras, fmt, money } from '../locales'
+import { fmt, money } from '../locales'
 
 const STATUS_DOT: Record<ListingStatus, string> = {
   healthy: 'bg-[var(--success)]',
@@ -48,7 +48,7 @@ export function ListingList({ listings, loading, error, onChanged }: Props) {
 
   // The operator's own demo listing is stored in English on the server, so its name is localised here.
   const displayName = (l: PricedListing) => {
-    const tx = l.id === 'demo-summarizer' ? extras[lang].services.summarize : undefined
+    const tx = l.id === 'demo-summarizer' ? t.services.summarize : undefined
     return tx ? `${tx.name} · ${t.listDemoTag}` : l.name
   }
 

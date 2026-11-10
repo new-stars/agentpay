@@ -34,6 +34,20 @@ export default defineConfig({
       'vite-plugin-node-polyfills/shims/process',
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/connectkit/') || id.includes('/@aave/') || id.includes('/@walletconnect/') || id.includes('/@reown/') || id.includes('/qrcode/')) return 'wallet-ui'
+          if (id.includes('/viem/') || id.includes('/ox/') || id.includes('/@noble/') || id.includes('/@scure/') || id.includes('/wagmi/') || id.includes('/@wagmi/') || id.includes('/abitype/')) return 'chain'
+          if (id.includes('/framer-motion/') || id.includes('/motion-dom/') || id.includes('/motion-utils/')) return 'motion'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/') || id.includes('/@tanstack/')) return 'react'
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     allowedHosts: true,
     cors: true,

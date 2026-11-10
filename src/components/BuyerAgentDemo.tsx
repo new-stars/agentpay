@@ -3,7 +3,7 @@ import { Bot, Search, Loader2 } from 'lucide-react'
 import type { PricedListing } from '../registry'
 import { useLang, type FullT } from '../LangContext'
 import { describeError } from '../apiError'
-import { extras, fmt, money } from '../locales'
+import { fmt, money } from '../locales'
 import type { LangCode } from '../i18n'
 
 const CATEGORIES = ['NLP', 'Data', 'DeFi', 'Compliance', 'Dev Tools', 'Other']
@@ -79,7 +79,7 @@ export function BuyerAgentDemo() {
 
 function Result({ data, t, lang }: { data: SelectResponse; t: FullT; lang: LangCode }) {
   const b = data.best
-  const tx = b.id === 'demo-summarizer' ? extras[lang].services.summarize : undefined
+  const tx = b.id === 'demo-summarizer' ? t.services.summarize : undefined
   const name = tx ? `${tx.name} · ${t.listDemoTag}` : b.name
   // The translated sentence decides where the call goes, so split around the placeholder.
   const [before, after = ''] = t.agentStep4.split('{call}')

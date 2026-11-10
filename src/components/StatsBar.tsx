@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { TokenUSDC } from '@web3icons/react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { useLang } from '../LangContext'
 import { NUMBER_LOCALE } from '../locales'
 
@@ -64,7 +64,7 @@ export function StatsBar({ serviceCount }: { serviceCount: number }) {
   return (
     <div className="mb-12 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
       {stats.map((s, i) => (
-        <motion.div
+        <m.div
           key={s.key}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -84,7 +84,7 @@ export function StatsBar({ serviceCount }: { serviceCount: number }) {
           <span className={`text-sm font-semibold tabular-nums leading-tight transition-colors ${s.icon ? 'text-[var(--success)]' : 'text-[var(--ink)]'}`}>
             {s.value}
           </span>
-        </motion.div>
+        </m.div>
       ))}
     </div>
   )

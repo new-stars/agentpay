@@ -174,6 +174,7 @@ export const zh: Extra = {
   rcNoSeller: "尚未设置收款地址，因此没有可追踪的内容。请在 .env 中设置 VITE_SELLER_ADDRESS。",
   rcError: "暂时无法加载付款记录。",
   rcSummary: "{n} 笔付款 · {amount} USDC",
+  rcToday: "今天本服务器：{n} 笔付款 · {amount} USDC",
   rcMedian: "通常完成用时：{time}",
   rcMedianNone: "还没有付款完成结算",
   rcViewTx: "结算交易",

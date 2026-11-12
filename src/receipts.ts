@@ -32,6 +32,8 @@ export interface ReceiptsResponse {
   medianSecondsToComplete: number | null
   /** True when Circle returned a full page for some stage, so the counts are a lower bound */
   truncated: boolean
+  /** This server's own count for today (not limited to Circle's newest-50 lists) */
+  today: { day: string; count: number; volumeUsdc: string }
 }
 
 export const isTerminal = (s: Receipt['status']): boolean => s === 'completed' || s === 'failed'

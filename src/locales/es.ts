@@ -174,6 +174,7 @@ export const es: Extra = {
   rcNoSeller: "No hay una dirección de cobro configurada, así que no hay nada que seguir. Define VITE_SELLER_ADDRESS en .env.",
   rcError: "No se pudieron cargar los pagos ahora mismo.",
   rcSummary: "{n} pagos · {amount} USDC",
+  rcToday: "Hoy en este servidor: {n} pagos · {amount} USDC",
   rcMedian: "Tiempo habitual hasta completarse: {time}",
   rcMedianNone: "Todavía no se ha completado ningún pago",
   rcViewTx: "Transacción de liquidación",

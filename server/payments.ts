@@ -10,6 +10,7 @@ import { getChain, buildTxExplorerUrl } from "../src/onchain-facts";
 import { isTerminal, STAGES, type Receipt, type ReceiptsResponse, type TransferStatus } from "../src/receipts";
 import { loadJson, saveJson } from "./store";
 import { rateLimit } from "./ratelimit";
+import { recentStats } from "./ledger";
 
 const ALL_STATUSES: TransferStatus[] = [...STAGES, "failed"];
 const PAGE = 50;
@@ -89,7 +90,7 @@ export function createPaymentsRouter(opts: { seller?: string; facilitatorUrl: st
   router.get("/", rateLimit({ name: "payments", max: 60, windowMs: 60_000 }), rateLimit({ name: "payments", max: 600, windowMs: 60_000, global: true }), async (_req, res) => {
     const seller = opts.seller;
     if (!seller) {
-      res.json({ seller: null, receipts: [], counts: emptyCounts(), totalUsdc: "0", medianSecondsToComplete: null, truncated: false } satisfies ReceiptsResponse);
+      res.json({ seller: null, receipts: [], counts: emptyCounts(), totalUsdc: "0", medianSecondsToComplete: null, truncated: false, today: (await recentStats(1))[0] } satisfies ReceiptsResponse);
       return;
     }
     if (cache && Date.now() - cache.at < CACHE_MS) { res.json(cache.body); return; }
@@ -130,6 +131,7 @@ export function createPaymentsRouter(opts: { seller?: string; facilitatorUrl: st
       totalUsdc: formatUsdc(totalAtomic),
       medianSecondsToComplete: lags.length ? Math.round(lags[Math.floor(lags.length / 2)] as number) : null,
       truncated,
+      today: (await recentStats(1))[0],
     };
     cache = { at: Date.now(), body };
     res.json(body);

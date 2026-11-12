@@ -174,6 +174,7 @@ export const de: Extra = {
   rcNoSeller: "Es ist keine Auszahlungsadresse festgelegt, daher gibt es nichts zu verfolgen. Setze VITE_SELLER_ADDRESS in der .env.",
   rcError: "Die Zahlungen konnten gerade nicht geladen werden.",
   rcSummary: "{n} Zahlungen · {amount} USDC",
+  rcToday: "Heute auf diesem Server: {n} Zahlungen · {amount} USDC",
   rcMedian: "Übliche Dauer bis zum Abschluss: {time}",
   rcMedianNone: "Noch keine Zahlung ist abgeschlossen",
   rcViewTx: "Abrechnungstransaktion",

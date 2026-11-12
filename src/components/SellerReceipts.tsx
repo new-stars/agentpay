@@ -72,6 +72,11 @@ export function SellerReceipts() {
         )}
       </div>
       <p className="text-[11px] text-[var(--subtle)] leading-relaxed mb-3">{t.rcIntro}</p>
+      {data?.seller && data.today.count > 0 && (
+        <p className="text-[11px] text-[var(--ink)] mb-3">
+          {fmt(t.rcToday, { n: new Intl.NumberFormat(NUMBER_LOCALE[lang]).format(data.today.count), amount: money(lang, data.today.volumeUsdc) })}
+        </p>
+      )}
 
       {failed && !data && <p className="text-xs text-[var(--subtle)]">{t.rcError}</p>}
       {data && !data.seller && <p className="text-xs text-[var(--subtle)]">{t.rcNoSeller}</p>}

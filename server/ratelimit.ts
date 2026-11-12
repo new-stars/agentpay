@@ -11,6 +11,12 @@ import { isServerless, redisPipeline, storeKind } from "./store";
 /** Operators of a private or trusted deployment can raise every limit at once (1 to 100). Default: 1. */
 const SCALE = Math.min(100, Math.max(1, Math.floor(Number(process.env.RATE_LIMIT_MULTIPLIER)) || 1));
 
+/**
+ * Each request costs one Redis command per limit it passes. If your Redis plan is metered and traffic is high,
+ * set RATE_LIMIT_STORE=memory to keep counters per instance instead (weaker across many instances, free).
+ */
+const USE_REDIS = storeKind === "upstash" && process.env.RATE_LIMIT_STORE !== "memory";
+
 const first = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
 
 /**
@@ -53,7 +59,7 @@ async function hit(key: string, windowMs: number): Promise<{ count: number; rese
   const resetAt = (windowIndex + 1) * windowMs;
   const windowKey = `rl:${key}:${windowIndex}`;
 
-  if (storeKind === "upstash") {
+  if (USE_REDIS) {
     try {
       const [count] = await redisPipeline([["INCR", windowKey], ["PEXPIRE", windowKey, windowMs]]);
       if (typeof count === "number") return { count, resetAt };

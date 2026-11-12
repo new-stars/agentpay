@@ -174,6 +174,7 @@ export const fr: Extra = {
   rcNoSeller: "Aucune adresse de paiement n’est définie, il n’y a donc rien à suivre. Définissez VITE_SELLER_ADDRESS dans .env.",
   rcError: "Impossible de charger les paiements pour le moment.",
   rcSummary: "{n} paiements · {amount} USDC",
+  rcToday: "Aujourd’hui sur ce serveur : {n} paiements · {amount} USDC",
   rcMedian: "Délai habituel avant achèvement : {time}",
   rcMedianNone: "Aucun paiement n’est encore terminé",
   rcViewTx: "Transaction de règlement",

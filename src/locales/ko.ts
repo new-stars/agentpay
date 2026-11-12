@@ -174,6 +174,7 @@ export const ko: Extra = {
   rcNoSeller: "수취 주소가 설정되지 않아 추적할 내용이 없습니다. .env에 VITE_SELLER_ADDRESS를 설정하세요.",
   rcError: "지금은 결제 내역을 불러올 수 없습니다.",
   rcSummary: "결제 {n}건 · {amount} USDC",
+  rcToday: "오늘 이 서버: 결제 {n}건 · {amount} USDC",
   rcMedian: "완료까지 보통 걸리는 시간: {time}",
   rcMedianNone: "아직 완료된 결제가 없습니다",
   rcViewTx: "정산 트랜잭션",

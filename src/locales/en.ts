@@ -108,6 +108,7 @@ export const en: Extra = {
   rcNoSeller: "No payout address is set, so there is nothing to track. Set VITE_SELLER_ADDRESS in .env.",
   rcError: "Could not load payments right now.",
   rcSummary: "{n} payments · {amount} USDC",
+  rcToday: "Today on this server: {n} payments · {amount} USDC",
   rcMedian: "Typical time to completion: {time}",
   rcMedianNone: "No payment has completed yet",
   rcViewTx: "Settlement transaction",

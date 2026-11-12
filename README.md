@@ -46,6 +46,9 @@ Checks: `bun run check` (lint and typecheck).
 | `PUBLIC_SITE_URL` | Public address of the deployed site. Used for the operator's own marketplace listing. Vercel and Netlify supply it automatically. |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Optional Redis database (also accepted as `KV_REST_API_URL` and `KV_REST_API_TOKEN`). Without it, marketplace listings on a serverless host live only as long as the instance does. |
 | `PAYMENTS_NETWORK` | Network whose payments the receipts panel lists. Defaults to Arc Testnet. |
+| `SETTLE_RATE_PER_SECOND`, `SETTLE_BURST` | Optional. How fast this backend calls Circle's settlement service (defaults 7 and 10). Raise only once Circle confirms higher limits. |
+| `FACILITATOR_TIMEOUT_MS` | Optional. Deadline for each call to Circle's settlement service (default 8000). |
+| `RATE_LIMIT_STORE` | Optional. Set to `memory` to keep rate-limit counters per instance even when Redis is configured. |
 | `ADMIN_TOKEN` | Optional, at least 16 characters. Enables `DELETE /registry/<id>` so you can remove an abusive listing. Without it that route does not exist. |
 | `RATE_LIMIT_MULTIPLIER` | Optional, 1 to 100 (default 1). Raises every rate limit at once, for a trusted or private deployment. |
 | `TRUST_PROXY_HEADER` | Optional. Name of a header your own proxy sets with the real client address. Forwarding headers are otherwise ignored, except on Vercel and Netlify. |
@@ -67,6 +70,9 @@ bun run scripts/buyer-bot.ts
 ## Payment speed and safety checks (testnet)
 
 ```
+bun run scripts/load-test.ts         # payments at a steady rate (RATE, SECONDS), then an exact money check
+bun run scripts/breaker-test.ts      # stand-in settlement service: pause, short-circuit, recovery
+bun run scripts/reconcile.ts         # payments Circle received that this server has no record of
 bun run scripts/soak-test.ts         # repeated real payments on every paid route, then an exact money check
 bun run scripts/payment-bench.ts     # per-payment timing and a parallel burst
 bun run scripts/payment-attacks.ts   # forged, underpaid, replayed and unfunded payments must all be refused
@@ -112,3 +118,5 @@ LIMITS=1 bun run scripts/security-check.ts                                      
 ## If Circle's settlement service pushes back
 
 If Circle's settlement service fails three times in a row, the backend pauses real payments for a short, growing time and answers `503` with `Retry-After`. Nothing is charged. Buyers should wait and retry. The cause is written to the server log. See `docs/mainnet-readiness.md` before going to mainnet.
+
+See `docs/scaling.md` for what was measured at volume and how to run this for tens of thousands of payments a day.

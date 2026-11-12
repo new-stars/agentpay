@@ -174,6 +174,7 @@ export const ja: Extra = {
   rcNoSeller: "受取アドレスが設定されていないため、追跡するものがありません。.envにVITE_SELLER_ADDRESSを設定してください。",
   rcError: "現在、支払いを読み込めません。",
   rcSummary: "{n}件の支払い · {amount} USDC",
+  rcToday: "本日のこのサーバー：{n}件の支払い · {amount} USDC",
   rcMedian: "完了までの目安：{time}",
   rcMedianNone: "完了した支払いはまだありません",
   rcViewTx: "決済トランザクション",

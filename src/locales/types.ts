@@ -120,6 +120,7 @@ export interface Extra {
   rcNoSeller: string
   rcError: string
   rcSummary: string
+  rcToday: string // {n} {amount}
   rcMedian: string
   rcMedianNone: string
   rcViewTx: string

@@ -20,6 +20,8 @@ In the longest wait, 159 of 182 payments reached "completed" within about 7 minu
 Circle's settlement service is behind a web firewall. After a sustained burst from one machine it answered with an HTML page instead of JSON, then recovered on its own within minutes. The backend now logs the real cause, pauses real payments for a short growing interval after three failures in a row, and answers `503` with `Retry-After` and `"nothing was charged"`. A buyer must treat that as "retry later".
 Ask Circle what the limits are for your production traffic, and whether an authenticated, higher-limit access route exists. The gateway middleware can send extra headers on every settlement call.
 
+Volume tests, the settlement limit and what to do about it are in `docs/scaling.md`.
+
 ## What is tied to testnet in the code
 - Settlement service address (`FACILITATOR_URL`, defaults to the testnet one).
 - Network whose payments the receipts panel lists (`PAYMENTS_NETWORK`).

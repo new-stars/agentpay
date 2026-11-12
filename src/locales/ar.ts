@@ -174,6 +174,7 @@ export const ar: Extra = {
   rcNoSeller: "لم يتم ضبط عنوان استلام، لذا لا يوجد ما يمكن تتبعه. اضبط VITE_SELLER_ADDRESS في ملف .env.",
   rcError: "تعذّر تحميل المدفوعات الآن.",
   rcSummary: "{n} دفعات · {amount} USDC",
+  rcToday: "اليوم على هذا الخادم: {n} دفعات · {amount} USDC",
   rcMedian: "الوقت المعتاد حتى الاكتمال: {time}",
   rcMedianNone: "لم تكتمل أي دفعة بعد",
   rcViewTx: "معاملة التسوية",

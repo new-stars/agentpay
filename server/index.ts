@@ -5,6 +5,8 @@ import { createRegistryRouter } from "./registry";
 import { createPaymentsRouter, recordRoute } from "./payments";
 import { isServerless, storeKind } from "./store";
 import { rateLimit } from "./ratelimit";
+import { createPacer } from "./pacer";
+import { createLedgerRouter, recordLedger } from "./ledger";
 import { cors, errorHandler, notFound, securityHeaders } from "./security";
 import { parseUsdc } from "../src/onchain-money";
 
@@ -24,7 +26,7 @@ app.disable("x-powered-by");
 app.use(securityHeaders);
 app.use(cors);
 // One visitor cannot hammer the service as a whole; stricter limits sit on the expensive routes.
-app.use(rateLimit({ name: "all", max: 300, windowMs: 60_000 }));
+app.use(rateLimit({ name: "all", max: 1_200, windowMs: 60_000 }));
 app.use(express.json({ limit: "200kb" }));
 
 const SELLER_ADDRESS = process.env.VITE_SELLER_ADDRESS;
@@ -37,6 +39,40 @@ if (!SELLER_ADDRESS) {
     "[AgentPay] VITE_SELLER_ADDRESS not set — using demo placeholder. Set it in .env to receive real payments."
   );
 }
+
+// The payment gate calls Circle's settlement service with no time limit of its own. If that service hangs, every
+// buyer would hang with it and requests would pile up. Give each of those calls a deadline; a timeout counts as a
+// failed settlement (503, nothing charged, circuit breaker).
+const FACILITATOR_TIMEOUT_MS = Number(process.env.FACILITATOR_TIMEOUT_MS) > 0 ? Number(process.env.FACILITATOR_TIMEOUT_MS) : 8_000;
+const nativeFetch = globalThis.fetch.bind(globalThis);
+let lastBlockLog = 0;
+globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!url.startsWith(FACILITATOR_URL)) return nativeFetch(input, init);
+  // A call the web firewall in front of Circle turned away (an HTML page or 429, not a JSON answer) never reached
+  // Circle's service, so asking again cannot settle anything twice. HTTP 429 means "too fast": halve the pace for a
+  // while, wait, and go back through the pacer. Other refusals get one quick retry.
+  const attempts = (init?.method ?? "GET").toUpperCase() === "POST" ? 3 : 1;
+  for (let i = 0; ; i++) {
+    const res = await nativeFetch(input, init?.signal ? init : { ...init, signal: AbortSignal.timeout(FACILITATOR_TIMEOUT_MS) });
+    const type = res.headers.get("content-type") ?? "";
+    const turnedAway = !type.includes("json") && (type.includes("html") || res.status === 429 || res.status === 403 || res.status >= 500);
+    if (!turnedAway) return res;
+    if (Date.now() - lastBlockLog > 5_000) {
+      lastBlockLog = Date.now();
+      const body = await res.clone().text().catch(() => "");
+      console.warn(`[AgentPay] settlement service sent a non-JSON reply (HTTP ${res.status}, ${res.headers.get("server") ?? "unknown server"}, cf-ray ${res.headers.get("cf-ray") ?? "-"}): ${body.replace(/\s+/g, " ").slice(0, 200)}`);
+    }
+    if (i >= attempts - 1) return res;
+    if (res.status === 429) {
+      pacer.slowDown(15_000);
+      await new Promise(r => setTimeout(r, 1_000 + Math.random() * 1_000));
+      if (!(await pacer.take())) return res;
+    } else {
+      await new Promise(r => setTimeout(r, 200 * (i + 1) + Math.random() * 150));
+    }
+  }
+}) as typeof fetch;
 
 const gateway = createGatewayMiddleware({
   sellerAddress: (SELLER_ADDRESS || "0x0000000000000000000000000000000000000000") as `0x${string}`,
@@ -71,24 +107,47 @@ const DEMO_MODE = process.env.DEMO_MODE !== "off";
 // Circle's settlement service sits behind a web firewall that can answer a burst of calls with an HTML block page
 // instead of JSON. Keep hammering it and the block lasts longer, so after a few failures in a row stop calling it for
 // a short, growing pause and tell buyers when to retry. Nothing is charged while this is open.
-const breaker = { fails: 0, openUntil: 0, pause: 10_000 };
-const BREAKER_AFTER = 3;
+const breaker = { recent: [] as boolean[], openUntil: 0, pause: 10_000 };
+const BREAKER_WINDOW = 20; // look at the last 20 settlements
+const BREAKER_MAX_FAILS = 6; // open at 6 failures among them...
+const BREAKER_MAX_STREAK = 3; // ...or 3 failures in a row
 const breakerRetryAfter = () => Math.max(1, Math.ceil((breaker.openUntil - Date.now()) / 1000));
 function noteSettlementResult(ok: boolean) {
-  if (ok) { breaker.fails = 0; breaker.pause = 10_000; return; }
-  breaker.fails += 1;
-  if (breaker.fails >= BREAKER_AFTER) {
+  breaker.recent.push(ok);
+  if (breaker.recent.length > BREAKER_WINDOW) breaker.recent.shift();
+  if (ok) {
+    if (breaker.recent.slice(-5).every(Boolean)) breaker.pause = 10_000; // healthy again
+    return;
+  }
+  const fails = breaker.recent.filter(v => !v).length;
+  const streak = breaker.recent.slice(-BREAKER_MAX_STREAK);
+  if (fails >= BREAKER_MAX_FAILS || (streak.length === BREAKER_MAX_STREAK && streak.every(v => !v))) {
     breaker.openUntil = Date.now() + breaker.pause;
-    console.warn(`[AgentPay] settlement service failing, pausing payments for ${breaker.pause / 1000}s`);
+    console.warn(`[AgentPay] settlement service failing (${fails} of the last ${breaker.recent.length}), pausing payments for ${breaker.pause / 1000}s`);
     breaker.pause = Math.min(breaker.pause * 2, 60_000);
-    breaker.fails = 0;
+    breaker.recent = [];
   }
 }
 
-const unpaidPerIp = rateLimit({ name: "pay-unpaid", max: 120, windowMs: 60_000 });
+const unpaidPerIp = rateLimit({ name: "pay-unpaid", max: 600, windowMs: 60_000 });
 const demoPerIp = rateLimit({ name: "pay-demo", max: 60, windowMs: 60_000 });
-const paidPerIp = rateLimit({ name: "pay-real", max: 60, windowMs: 60_000 });
-const paidGlobal = rateLimit({ name: "pay-real", max: 1200, windowMs: 60_000, global: true });
+const paidPerIp = rateLimit({ name: "pay-real", max: 600, windowMs: 60_000 });
+const paidGlobal = rateLimit({ name: "pay-real", max: 3_000, windowMs: 60_000, global: true });
+
+// Calls to Circle go out at a steady pace (bursts allowed), so a spike of buyers waits briefly in a queue instead of
+// hitting Circle's firewall. Measured on testnet from one machine: Circle's edge answered HTTP 429 above roughly 9 settlements
+// per second, and it looks like a count over a window of about ten seconds, so the burst allowance is kept small. The
+// defaults stay below that; raise them only once Circle confirms higher limits for you.
+const envNumber = (name: string, fallback: number) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+const pacer = createPacer({
+  ratePerSecond: envNumber("SETTLE_RATE_PER_SECOND", 7),
+  burst: envNumber("SETTLE_BURST", 10),
+  maxWaitMs: 10_000,
+  maxQueue: 1_000,
+});
 
 function gate(price: string): express.RequestHandler {
   const real = gateway.require(price) as express.RequestHandler;
@@ -125,6 +184,7 @@ function gate(price: string): express.RequestHandler {
       if (pay?.verified && pay.transaction && res.statusCode < 400) {
         noteSettlementResult(true);
         recordRoute({ id: pay.transaction, route: req.path });
+        void recordLedger({ id: pay.transaction, at: new Date().toISOString(), route: req.path, payer: pay.payer, amount: pay.amount, network: pay.network });
       }
     });
     // The payment gate hides the real cause of a failure behind a bare 500. Log it for the operator, and tell the
@@ -142,7 +202,19 @@ function gate(price: string): express.RequestHandler {
       }
       return originalEnd(...args);
     }) as typeof res.end;
-    real(req, res, next);
+    // Only a request that carries a payment makes a call to Circle. The price list (402) is answered locally.
+    if (req.get("payment-signature") === undefined) { real(req, res, next); return; }
+    pacer.take().then(granted => {
+      // The buyer hung up while waiting: make no call, charge nothing. (Check the connection, not the request:
+      // a request whose body was already read reports itself as destroyed.)
+      if (res.destroyed || req.socket.destroyed) return;
+      if (!granted) {
+        res.setHeader("Retry-After", "2");
+        res.status(503).json({ error: "Busy, nothing was charged. Retry shortly", code: "busy" });
+        return;
+      }
+      real(req, res, next);
+    }, next);
   };
 
   return (req, res, next) => {
@@ -393,11 +465,12 @@ app.use("/registry", registry);
 if (!isServerless) {
   registry.warm().catch(err => console.warn("[AgentPay] registry start-up failed:", err instanceof Error ? err.message : err));
 }
+app.use(createLedgerRouter());
 app.use("/payments", createPaymentsRouter({ seller: SELLER_ADDRESS, facilitatorUrl: FACILITATOR_URL }));
 
 // Health
 app.get("/health", (_req, res) =>
-  res.json({ status: "ok", storage: storeKind, sellerConfigured: Boolean(SELLER_ADDRESS), demoMode: DEMO_MODE }),
+  res.json({ status: "ok", storage: storeKind, sellerConfigured: Boolean(SELLER_ADDRESS), demoMode: DEMO_MODE, settlement: { ...pacer.stats(), pausedForSeconds: Math.max(0, Math.ceil((breaker.openUntil - Date.now()) / 1000)) } }),
 );
 
 app.use(notFound);

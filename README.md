@@ -67,6 +67,7 @@ bun run scripts/buyer-bot.ts
 ## Payment speed and safety checks (testnet)
 
 ```
+bun run scripts/soak-test.ts         # repeated real payments on every paid route, then an exact money check
 bun run scripts/payment-bench.ts     # per-payment timing and a parallel burst
 bun run scripts/payment-attacks.ts   # forged, underpaid, replayed and unfunded payments must all be refused
 ```
@@ -107,3 +108,7 @@ Run the checks against a running backend:
 API_BASE=http://localhost:3002 ADMIN_TOKEN=<token> bun run scripts/security-check.ts   # backend started with RATE_LIMIT_MULTIPLIER=50 and the same ADMIN_TOKEN
 LIMITS=1 bun run scripts/security-check.ts                                              # backend with default limits
 ```
+
+## If Circle's settlement service pushes back
+
+If Circle's settlement service fails three times in a row, the backend pauses real payments for a short, growing time and answers `503` with `Retry-After`. Nothing is charged. Buyers should wait and retry. The cause is written to the server log. See `docs/mainnet-readiness.md` before going to mainnet.

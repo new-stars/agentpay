@@ -68,6 +68,23 @@ const DEMO_MODE = process.env.DEMO_MODE !== "off";
 
 // Each paid call class has its own budget. Paying attempts reach Circle's service, so they are the tightest
 // and also capped for the whole service.
+// Circle's settlement service sits behind a web firewall that can answer a burst of calls with an HTML block page
+// instead of JSON. Keep hammering it and the block lasts longer, so after a few failures in a row stop calling it for
+// a short, growing pause and tell buyers when to retry. Nothing is charged while this is open.
+const breaker = { fails: 0, openUntil: 0, pause: 10_000 };
+const BREAKER_AFTER = 3;
+const breakerRetryAfter = () => Math.max(1, Math.ceil((breaker.openUntil - Date.now()) / 1000));
+function noteSettlementResult(ok: boolean) {
+  if (ok) { breaker.fails = 0; breaker.pause = 10_000; return; }
+  breaker.fails += 1;
+  if (breaker.fails >= BREAKER_AFTER) {
+    breaker.openUntil = Date.now() + breaker.pause;
+    console.warn(`[AgentPay] settlement service failing, pausing payments for ${breaker.pause / 1000}s`);
+    breaker.pause = Math.min(breaker.pause * 2, 60_000);
+    breaker.fails = 0;
+  }
+}
+
 const unpaidPerIp = rateLimit({ name: "pay-unpaid", max: 120, windowMs: 60_000 });
 const demoPerIp = rateLimit({ name: "pay-demo", max: 60, windowMs: 60_000 });
 const paidPerIp = rateLimit({ name: "pay-real", max: 60, windowMs: 60_000 });
@@ -94,6 +111,11 @@ function gate(price: string): express.RequestHandler {
       res.status(503).json({ error: "Payout address is not configured", code: "seller_not_configured" });
       return;
     }
+    if (req.get("payment-signature") !== undefined && Date.now() < breaker.openUntil) {
+      res.setHeader("Retry-After", String(breakerRetryAfter()));
+      res.status(503).json({ error: "Payment service temporarily unavailable, nothing was charged", code: "settlement_unavailable" });
+      return;
+    }
     if (process.env.PERF_LOG) {
       const t0 = performance.now();
       res.on("finish", () => console.log(`[perf] ${req.path} ${Math.round(performance.now() - t0)}ms status=${res.statusCode}`));
@@ -101,9 +123,25 @@ function gate(price: string): express.RequestHandler {
     res.on("finish", () => {
       const pay = (req as PaidRequest).payment;
       if (pay?.verified && pay.transaction && res.statusCode < 400) {
+        noteSettlementResult(true);
         recordRoute({ id: pay.transaction, route: req.path });
       }
     });
+    // The payment gate hides the real cause of a failure behind a bare 500. Log it for the operator, and tell the
+    // buyer the truth in a standard way: a temporary problem that is safe to retry (nothing was charged).
+    const originalEnd = res.end.bind(res) as (...args: unknown[]) => express.Response;
+    res.end = ((...args: unknown[]) => {
+      if (res.statusCode >= 500 && typeof args[0] === "string") {
+        console.error(`[AgentPay] ${req.path} -> ${res.statusCode}: ${args[0].slice(0, 300)}`);
+        if (args[0].includes("Payment processing error")) {
+          noteSettlementResult(false);
+          res.statusCode = 503;
+          res.setHeader("Retry-After", String(Math.max(5, breakerRetryAfter())));
+          args[0] = JSON.stringify({ error: "Payment service temporarily unavailable, nothing was charged", code: "settlement_unavailable" });
+        }
+      }
+      return originalEnd(...args);
+    }) as typeof res.end;
     real(req, res, next);
   };
 
@@ -352,7 +390,9 @@ const registry = createRegistryRouter({
   demoPayTo: SELLER_ADDRESS,
 });
 app.use("/registry", registry);
-if (!isServerless) void registry.warm();
+if (!isServerless) {
+  registry.warm().catch(err => console.warn("[AgentPay] registry start-up failed:", err instanceof Error ? err.message : err));
+}
 app.use("/payments", createPaymentsRouter({ seller: SELLER_ADDRESS, facilitatorUrl: FACILITATOR_URL }));
 
 // Health
@@ -365,10 +405,24 @@ app.use(errorHandler);
 
 // A normal server listens on a port. A serverless host calls the exported app directly.
 if (!isServerless) {
-  app.listen(PORT, () => {
+  // One bad background task must not take the whole service down.
+  process.on("unhandledRejection", reason => {
+    console.error("[AgentPay] unhandled rejection:", reason instanceof Error ? reason.message : reason);
+  });
+
+  const server = app.listen(PORT, () => {
     console.log(`[AgentPay] server running on http://localhost:${PORT}`);
     console.log(`[AgentPay] seller=${SELLER_ADDRESS || "(not set)"}`);
   });
+
+  // Finish in-flight payments before exiting, so a restart never cuts a settlement in half.
+  const shutdown = (signal: string) => {
+    console.log(`[AgentPay] ${signal} received, finishing open requests`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10_000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 export default app;

@@ -14,6 +14,7 @@ const CATEGORIES = ["NLP", "Data", "DeFi", "Compliance", "Dev Tools", "Other"];
 const PROBE_TIMEOUT_MS = 5_000;
 const RECHECK_MIN_INTERVAL_MS = 10_000;
 const STALE_AFTER_MS = 10 * 60_000;
+const SWEEP_EVERY_MS = 5 * 60_000;
 const MAX_PER_PAYOUT = 5;
 const MAX_PROBE_BYTES = 64 * 1024;
 const PROBE_DEADLINE_MS = 8_000;
@@ -301,6 +302,13 @@ export function createRegistryRouter(opts: { demoBaseUrl: string; demoPath: stri
       }
       trusted.add("demo-summarizer");
       await refreshStale(isServerless ? 5 : MAX_LISTINGS);
+      // A normal server has no request-time re-checks, so look again every few minutes. This is what catches a
+      // seller who changes the price or payout address after being listed.
+      if (!isServerless) {
+        setInterval(() => {
+          refreshStale(25).catch(err => console.warn("[Registry] periodic check failed:", err instanceof Error ? err.message : err));
+        }, SWEEP_EVERY_MS).unref();
+      }
     })();
     return ready;
   };

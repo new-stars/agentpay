@@ -73,6 +73,7 @@ bun run scripts/buyer-bot.ts
 
 ```
 bun run scripts/credits-test.ts     # prepaid credit with a hard pool, real payments (start the backend with CREDIT_POOL_USDC=1)
+bun run scripts/credit-burst.ts     # 1000 simultaneous calls on one key must never overspend it
 bun run scripts/load-test.ts         # payments at a steady rate (RATE, SECONDS), then an exact money check
 bun run scripts/breaker-test.ts      # stand-in settlement service: pause, short-circuit, recovery
 bun run scripts/reconcile.ts         # payments Circle received that this server has no record of
@@ -106,7 +107,7 @@ A seller can sell a fixed pool of API usage, for example 1000 USDC. A buyer buys
 
 - The amount is reserved from the pool before the payment settles, so two buyers cannot both pay for the last of it.
 - Demo mode can never create credit. Keys are stored only as hashes and shown once. Unspent credit is not refunded in this version.
-- Credit state lives in one running server. Stop it with SIGTERM so the latest balances are saved. Set the pool only to what you can really deliver.
+- Credit state lives in one running server. A purchase is written to disk before the key is handed over, so it survives a crash. Spending is written every couple of seconds, so stop the server with SIGTERM to save the very latest balances. Set the pool only to what you can really deliver.
 
 ## Security
 

@@ -479,11 +479,14 @@ app.post(
   "/credits/buy",
   bodyShape({ amount: ["string", 32], key: ["string", 80] }),
   purchaseGuard(gate),
-  (req: PaidRequest, res) => {
+  async (req: PaidRequest, res) => {
     const pay = req.payment;
     if (!pay?.verified) { res.status(400).json({ error: "Credit can only be bought with a real payment", code: "demo_not_allowed" }); return; }
     const existing = (req.body as { key?: string }).key;
     const out = issueCredit(BigInt(pay.amount), pay.payer, existing ? existing : undefined);
+    // The buyer has paid: write the new balance to disk BEFORE handing over the key, so a crash cannot leave them
+    // with a payment and no credit. (Spending a call only touches the balance; that is written every couple of seconds.)
+    await flushCredits();
     res.json({
       api_key: out.key,
       balanceUsdc: formatUsdc(out.balance),

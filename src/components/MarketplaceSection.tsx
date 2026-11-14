@@ -7,6 +7,7 @@ import { SellerForm } from './SellerForm'
 import { BuyerAgentDemo } from './BuyerAgentDemo'
 import { DiscoveryPanel } from './DiscoveryPanel'
 import { SellerReceipts } from './SellerReceipts'
+import { CreditPool } from './CreditPool'
 
 export function MarketplaceSection() {
   const { t } = useLang()
@@ -41,6 +42,7 @@ export function MarketplaceSection() {
       </div>
 
       <div className="space-y-4">
+        <CreditPool />
         <SellerReceipts />
         <DiscoveryPanel />
         <BuyerAgentDemo />

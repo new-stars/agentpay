@@ -8,7 +8,8 @@ import { rateLimit } from "./ratelimit";
 import { createPacer } from "./pacer";
 import { createLedgerRouter, recordLedger } from "./ledger";
 import { cors, errorHandler, notFound, securityHeaders } from "./security";
-import { parseUsdc } from "../src/onchain-money";
+import { formatUsdc, parseUsdc } from "../src/onchain-money";
+import { balanceHandler, flushCredits, hasCreditKey, infoHandler, issueCredit, purchaseGuard, spendCredit } from "./credits";
 
 // Extended request type with payment info injected by middleware
 type PaidRequest = express.Request & {
@@ -129,6 +130,7 @@ function noteSettlementResult(ok: boolean) {
   }
 }
 
+const creditPerIp = rateLimit({ name: "credit-call", max: 1_200, windowMs: 60_000 });
 const unpaidPerIp = rateLimit({ name: "pay-unpaid", max: 600, windowMs: 60_000 });
 const demoPerIp = rateLimit({ name: "pay-demo", max: 60, windowMs: 60_000 });
 const paidPerIp = rateLimit({ name: "pay-real", max: 600, windowMs: 60_000 });
@@ -217,7 +219,19 @@ function gate(price: string): express.RequestHandler {
     }, next);
   };
 
+  const priceAtomic = parseUsdc(price.replace("$", ""));
   return (req, res, next) => {
+    // A caller with a prepaid API key spends credit instead of paying per call.
+    if (hasCreditKey(req)) {
+      creditPerIp(req, res, () => {
+        spendCredit(req, res, priceAtomic).then(ok => {
+          if (!ok) return;
+          (req as PaidRequest).payment = { verified: false, payer: "credit", amount: priceAtomic.toString(), network: "credit" };
+          next();
+        }, next);
+      });
+      return;
+    }
     const demo = DEMO_MODE && req.get("x-demo-mode") === "simulate";
     const sig = req.get("payment-signature");
     const budget = demo ? demoPerIp : sig !== undefined ? paidPerIp : unpaidPerIp;
@@ -456,6 +470,28 @@ function publicSiteUrl(): string {
 }
 // On a serverless host the API is served under /api; on a normal server it is at the root.
 const API_PREFIX = isServerless ? "/api" : "";
+// ──────────────────────────────────────────
+// Prepaid credit: buy any amount (price = the amount asked) while the pool lasts, then spend it by API key
+// ──────────────────────────────────────────
+app.get("/credits", rateLimit({ name: "credit-info", max: 120, windowMs: 60_000 }), infoHandler);
+app.get("/credits/balance", rateLimit({ name: "credit-balance", max: 120, windowMs: 60_000 }), balanceHandler);
+app.post(
+  "/credits/buy",
+  bodyShape({ amount: ["string", 32], key: ["string", 80] }),
+  purchaseGuard(gate),
+  (req: PaidRequest, res) => {
+    const pay = req.payment;
+    if (!pay?.verified) { res.status(400).json({ error: "Credit can only be bought with a real payment", code: "demo_not_allowed" }); return; }
+    const existing = (req.body as { key?: string }).key;
+    const out = issueCredit(BigInt(pay.amount), pay.payer, existing ? existing : undefined);
+    res.json({
+      api_key: out.key,
+      balanceUsdc: formatUsdc(out.balance),
+      note: out.key ? "Save this key now: it is shown once. Send it as 'Authorization: Bearer <key>' on any paid route." : "Added to your existing key.",
+    });
+  },
+);
+
 const registry = createRegistryRouter({
   demoBaseUrl: publicSiteUrl(),
   demoPath: `${API_PREFIX}/pay/summarize`,
@@ -491,7 +527,7 @@ if (!isServerless) {
   // Finish in-flight payments before exiting, so a restart never cuts a settlement in half.
   const shutdown = (signal: string) => {
     console.log(`[AgentPay] ${signal} received, finishing open requests`);
-    server.close(() => process.exit(0));
+    server.close(() => { flushCredits().finally(() => process.exit(0)); });
     setTimeout(() => process.exit(1), 10_000).unref();
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));

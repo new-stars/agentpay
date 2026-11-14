@@ -49,6 +49,8 @@ Checks: `bun run check` (lint and typecheck).
 | `SETTLE_RATE_PER_SECOND`, `SETTLE_BURST` | Optional. How fast this backend calls Circle's settlement service (defaults 7 and 10). Raise only once Circle confirms higher limits. |
 | `FACILITATOR_TIMEOUT_MS` | Optional. Deadline for each call to Circle's settlement service (default 8000). |
 | `RATE_LIMIT_STORE` | Optional. Set to `memory` to keep rate-limit counters per instance even when Redis is configured. |
+| `CREDIT_POOL_USDC` | Optional. Turns on prepaid API credit and sets the seller's total pool, for example `1000`. Unset means off. Always off on a serverless host. |
+| `CREDIT_MIN_USDC`, `CREDIT_MAX_PURCHASE_USDC` | Optional. Smallest purchase (default 0.01) and largest single purchase (default: the whole pool). |
 | `ADMIN_TOKEN` | Optional, at least 16 characters. Enables `DELETE /registry/<id>` so you can remove an abusive listing. Without it that route does not exist. |
 | `RATE_LIMIT_MULTIPLIER` | Optional, 1 to 100 (default 1). Raises every rate limit at once, for a trusted or private deployment. |
 | `TRUST_PROXY_HEADER` | Optional. Name of a header your own proxy sets with the real client address. Forwarding headers are otherwise ignored, except on Vercel and Netlify. |
@@ -70,6 +72,7 @@ bun run scripts/buyer-bot.ts
 ## Payment speed and safety checks (testnet)
 
 ```
+bun run scripts/credits-test.ts     # prepaid credit with a hard pool, real payments (start the backend with CREDIT_POOL_USDC=1)
 bun run scripts/load-test.ts         # payments at a steady rate (RATE, SECONDS), then an exact money check
 bun run scripts/breaker-test.ts      # stand-in settlement service: pause, short-circuit, recovery
 bun run scripts/reconcile.ts         # payments Circle received that this server has no record of
@@ -96,6 +99,14 @@ On the host, set at least:
 Never add `AGENT_PRIVATE_KEY` or any other private key to a deployed site. It is only for the local test scripts.
 
 Payment receipts need no database: they are read from Circle by payout address, so they survive restarts and show payments made through any instance.
+
+## Prepaid API credit
+
+A seller can sell a fixed pool of API usage, for example 1000 USDC. A buyer buys any amount they like (0.1, 0.5, anything above the minimum), as many times as they like, as long as everything sold stays within the pool. Each purchase is one real payment whose price is the amount asked for, and the buyer gets an API key. Calls made with `Authorization: Bearer <key>` spend the price of the route from the key's balance, so no payment is needed per call. To top up, buy again and send the key in the request body.
+
+- The amount is reserved from the pool before the payment settles, so two buyers cannot both pay for the last of it.
+- Demo mode can never create credit. Keys are stored only as hashes and shown once. Unspent credit is not refunded in this version.
+- Credit state lives in one running server. Stop it with SIGTERM so the latest balances are saved. Set the pool only to what you can really deliver.
 
 ## Security
 

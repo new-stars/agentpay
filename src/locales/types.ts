@@ -121,6 +121,13 @@ export interface Extra {
   rcError: string
   rcSummary: string
   rcToday: string // {n} {amount}
+  crTitle: string
+  crIntro: string
+  crRemaining: string // {remaining} {total}
+  crMin: string // {min}
+  crDisabled: string
+  crSoldOut: string
+  crHow: string
   rcMedian: string
   rcMedianNone: string
   rcViewTx: string

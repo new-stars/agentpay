@@ -51,3 +51,4 @@ traces.jsonl
 .vercel/
 .netlify/
 dist-vercel/
+agentpay/

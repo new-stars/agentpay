@@ -9,6 +9,7 @@ import { createPacer } from "./pacer";
 import { createLedgerRouter, recordLedger } from "./ledger";
 import { cors, errorHandler, notFound, securityHeaders } from "./security";
 import { formatUsdc, parseUsdc } from "../src/onchain-money";
+import { createCreditRecoveryRouter } from "./credit-recovery";
 import { balanceHandler, flushCredits, hasCreditKey, infoHandler, issueCredit, purchaseGuard, spendCredit } from "./credits";
 
 // Extended request type with payment info injected by middleware
@@ -473,6 +474,7 @@ const API_PREFIX = isServerless ? "/api" : "";
 // ──────────────────────────────────────────
 // Prepaid credit: buy any amount (price = the amount asked) while the pool lasts, then spend it by API key
 // ──────────────────────────────────────────
+app.use(createCreditRecoveryRouter());
 app.get("/credits", rateLimit({ name: "credit-info", max: 120, windowMs: 60_000 }), infoHandler);
 app.get("/credits/balance", rateLimit({ name: "credit-balance", max: 120, windowMs: 60_000 }), balanceHandler);
 app.post(
@@ -489,8 +491,13 @@ app.post(
     await flushCredits();
     res.json({
       api_key: out.key,
+      account: out.account,
       balanceUsdc: formatUsdc(out.balance),
-      note: out.key ? "Save this key now: it is shown once. Send it as 'Authorization: Bearer <key>' on any paid route." : "Added to your existing key.",
+      note: out.key
+        ? out.separate
+          ? "You paid from a different wallet than the key owner, so a separate key was created. Save it now: it is shown once."
+          : "Save this key now: it is shown once. Send it as 'Authorization: Bearer <key>' on any paid route. If you lose it, recover it by signing with this wallet."
+        : "Added to your existing key.",
     });
   },
 );

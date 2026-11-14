@@ -18,7 +18,8 @@ import type express from "express";
 import { formatUsdc, parseUsdc } from "../src/onchain-money";
 import { isServerless, loadJson, saveJson } from "./store";
 
-interface Account { balance: string; bought: string; spent: string; createdAt: string; payer: string }
+export interface Account { id?: string; balance: string; bought: string; spent: string; createdAt: string; payer: string }
+export interface Refund { id: string; accountId: string; payer: string; amount: string; status: "pending" | "paid" | "rejected"; createdAt: string; resolvedAt?: string; txHash?: string }
 
 const parse = (v: string | undefined): bigint => {
   try { return v ? parseUsdc(v) : 0n; } catch { return 0n; }
@@ -32,6 +33,7 @@ export const creditsEnabled = (): boolean => capacity > 0n && !isServerless;
 
 let sold = 0n;
 const accounts = new Map<string, Account>();
+const refunds = new Map<string, Refund>();
 let loading: Promise<void> | undefined;
 let dirty = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -40,10 +42,11 @@ const hashKey = (key: string) => createHash("sha256").update(key).digest("hex");
 
 function ensureLoaded(): Promise<void> {
   loading ??= (async () => {
-    const saved = await loadJson<{ sold: string; accounts: Record<string, Account> }>("credits");
+    const saved = await loadJson<{ sold: string; accounts: Record<string, Account>; refunds?: Record<string, Refund> }>("credits");
     if (saved) {
       sold = BigInt(saved.sold);
-      for (const [h, a] of Object.entries(saved.accounts)) accounts.set(h, a);
+      for (const [h, a] of Object.entries(saved.accounts)) accounts.set(h, { ...a, id: a.id ?? h.slice(0, 12) });
+      for (const [id, r] of Object.entries(saved.refunds ?? {})) refunds.set(id, r);
     }
   })();
   return loading;
@@ -53,7 +56,7 @@ export async function flushCredits(): Promise<void> {
   if (timer) { clearTimeout(timer); timer = undefined; }
   if (!dirty) return;
   dirty = false;
-  await saveJson("credits", { sold: sold.toString(), accounts: Object.fromEntries(accounts) });
+  await saveJson("credits", { sold: sold.toString(), accounts: Object.fromEntries(accounts), refunds: Object.fromEntries(refunds) });
 }
 function touch() {
   dirty = true;
@@ -78,21 +81,26 @@ export const poolStatus = () => ({
 });
 
 /** Called once a real payment has settled: add the amount to the buyer's key, or create a key. */
-export function issueCredit(amount: bigint, payer: string, existingKey?: string): { key?: string; balance: bigint } {
+export function issueCredit(amount: bigint, payer: string, existingKey?: string): { key?: string; balance: bigint; account: string; separate?: boolean } {
   const created = new Date().toISOString();
+  const who = payer.toLowerCase();
+  let separate = false;
   if (existingKey) {
     const acct = accounts.get(hashKey(existingKey));
-    if (acct) {
+    // A key only grows from the wallet it was bought with, so a refund always has one clear destination.
+    if (acct && acct.payer.toLowerCase() === who) {
       acct.balance = (BigInt(acct.balance) + amount).toString();
       acct.bought = (BigInt(acct.bought) + amount).toString();
       touch();
-      return { balance: BigInt(acct.balance) };
+      return { balance: BigInt(acct.balance), account: acct.id ?? hashKey(existingKey).slice(0, 12) };
     }
+    separate = Boolean(acct);
   }
   const key = `ak_${randomBytes(24).toString("hex")}`;
-  accounts.set(hashKey(key), { balance: amount.toString(), bought: amount.toString(), spent: "0", createdAt: created, payer });
+  const id = randomBytes(6).toString("hex");
+  accounts.set(hashKey(key), { id, balance: amount.toString(), bought: amount.toString(), spent: "0", createdAt: created, payer: who });
   touch();
-  return { key, balance: amount };
+  return { key, balance: amount, account: id, separate };
 }
 
 const bearer = (req: express.Request): string | undefined => {
@@ -128,9 +136,18 @@ export async function balanceHandler(req: express.Request, res: express.Response
   res.json({ balanceUsdc: formatUsdc(BigInt(a.balance)), boughtUsdc: formatUsdc(BigInt(a.bought)), spentUsdc: formatUsdc(BigInt(a.spent)) });
 }
 
+/** Wallet signatures for key recovery are bound to this identity, so one server cannot replay them on another. */
+export const SITE_ID = (process.env.PUBLIC_SITE_URL ?? `http://localhost:${process.env.PORT ?? 3001}`).replace(/\/$/, "");
+
 export const infoHandler: express.RequestHandler = async (_req, res) => {
   await ensureLoaded();
-  res.json(poolStatus());
+  res.json({ ...poolStatus(), site: SITE_ID });
+};
+
+/** Internal handle for credit-recovery.ts. Nothing else should touch this. */
+export const _state = {
+  accounts, refunds, hashKey, touch, flush: flushCredits, ensureLoaded,
+  adjustSold: (delta: bigint) => { sold += delta; if (sold < 0n) sold = 0n; touch(); },
 };
 
 /**

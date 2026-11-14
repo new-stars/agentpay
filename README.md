@@ -49,6 +49,9 @@ Checks: `bun run check` (lint and typecheck).
 | `SETTLE_RATE_PER_SECOND`, `SETTLE_BURST` | Optional. How fast this backend calls Circle's settlement service (defaults 7 and 10). Raise only once Circle confirms higher limits. |
 | `FACILITATOR_TIMEOUT_MS` | Optional. Deadline for each call to Circle's settlement service (default 8000). |
 | `RATE_LIMIT_STORE` | Optional. Set to `memory` to keep rate-limit counters per instance even when Redis is configured. |
+| `CREDIT_REFUND_MIN_USDC` | Smallest refund a buyer can ask for. Default 0.01. |
+| `CREDIT_REFUND_RESTOCK` | Set to `off` to keep refunded credit out of the pool. |
+| `REFUND_MAX_FEE`, `REFUND_MIN_GAS_USDC` | Used by `scripts/pay-refunds.ts` on your own machine: fee cap and the gas the payout wallet must hold. |
 | `CREDIT_POOL_USDC` | Optional. Turns on prepaid API credit and sets the seller's total pool, for example `1000`. Unset means off. Always off on a serverless host. |
 | `CREDIT_MIN_USDC`, `CREDIT_MAX_PURCHASE_USDC` | Optional. Smallest purchase (default 0.01) and largest single purchase (default: the whole pool). |
 | `ADMIN_TOKEN` | Optional, at least 16 characters. Enables `DELETE /registry/<id>` so you can remove an abusive listing. Without it that route does not exist. |
@@ -74,6 +77,8 @@ bun run scripts/buyer-bot.ts
 ```
 bun run scripts/credits-test.ts     # prepaid credit with a hard pool, real payments (start the backend with CREDIT_POOL_USDC=1)
 bun run scripts/credit-burst.ts     # 1000 simultaneous calls on one key must never overspend it
+bun run scripts/credit-recovery-test.ts  # lost-key recovery and refunds, real payments (see docs/credit-recovery-refunds.md)
+bun run scripts/pay-refunds.ts      # operator tool: pay pending refunds from your own wallet
 bun run scripts/load-test.ts         # payments at a steady rate (RATE, SECONDS), then an exact money check
 bun run scripts/breaker-test.ts      # stand-in settlement service: pause, short-circuit, recovery
 bun run scripts/reconcile.ts         # payments Circle received that this server has no record of

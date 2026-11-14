@@ -1,0 +1,18 @@
+{
+  "name": "agentpay-server",
+  "private": true,
+  "type": "module",
+  "description": "Only what the backend needs at run time. The Docker image installs from this file.",
+  "dependencies": {
+    "@circle-fin/x402-batching": "^3.5.0",
+    "@x402/core": "^2.28.0",
+    "@x402/evm": "^2.28.0",
+    "express": "^5.3.0",
+    "viem": "^2.56.3"
+  },
+  "overrides": {
+    "viem": "^2.56.3",
+    "body-parser": "^2.4.0",
+    "qs": "^6.17.1"
+  }
+}

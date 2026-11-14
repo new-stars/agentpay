@@ -1,0 +1,16 @@
+# Nothing secret and nothing local goes into the image. Settings come from the platform's environment variables.
+.env
+.env.*
+.git
+agentpay
+node_modules
+server/node_modules
+server/data
+dist
+*.jsonl
+*.log
+.agents
+contracts
+lib
+docs
+scripts

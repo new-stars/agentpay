@@ -143,3 +143,7 @@ See `docs/scaling.md` for what was measured at volume and how to run this for te
 ## Hosting the page without its backend
 
 Vercel, Netlify and Hugging Face static Spaces only serve files, so the payment server is not there. The page notices (it asks the backend for `/health` once) and shows a short notice instead of failing panels. To give a static page a working backend, run the backend somewhere that keeps a server running, build the page with `VITE_API_BASE=https://your-backend`, and start the backend with `ALLOWED_ORIGINS=https://your-static-site`.
+
+## Running the backend on a server
+
+The repo has a `Dockerfile` for the payment server, marketplace and credit pool. See [docs/deploy-backend.md](docs/deploy-backend.md) for the settings and what was tested.

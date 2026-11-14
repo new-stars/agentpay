@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { API_BASE } from '../api'
 import { Globe2, Search, Loader2, ExternalLink } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { useLang } from '../LangContext'
@@ -48,7 +49,7 @@ export function DiscoveryPanel() {
         const qs = new URLSearchParams()
         if (request.q) qs.set('q', request.q)
         if (request.category) qs.set('category', request.category)
-        const res = await fetch(`/api/registry/discover?${qs.toString()}`)
+        const res = await fetch(`${API_BASE}/registry/discover?${qs.toString()}`)
         if (res.status === 429) { if (!cancelled) setFailed('rate'); return }
         if (!res.ok) throw new Error('discovery')
         const json = (await res.json()) as DiscoveryResponse

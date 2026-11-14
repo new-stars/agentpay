@@ -1,4 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react'
+import { useBackendStatus } from './api'
+import { BackendNotice } from './components/BackendNotice'
 import { Bot, Layers, Filter, ExternalLink, BookOpen, Search, X, Sun, Moon, Wallet } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { m } from 'framer-motion'
@@ -348,6 +350,7 @@ function useTheme() {
 export const SessionCostContext = React.createContext<{ add: (n: number) => void }>({ add: () => {} })
 
 export default function App() {
+  const backend = useBackendStatus()
   const { t, lang } = useLang()
   const [activeCategory, setActiveCategory] = useState('All')
   const [showSnippet, setShowSnippet] = useState(false)
@@ -425,6 +428,7 @@ export default function App() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-10">
+        {backend === 'offline' && <div className="mb-8"><BackendNotice /></div>}
 
         {/* ── Hero ── */}
         <section className="mb-12">

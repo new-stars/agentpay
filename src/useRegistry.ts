@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { API_BASE } from './api'
 import type { PricedListing } from './registry'
 
 interface RegistryResponse {
@@ -18,7 +19,7 @@ export function useRegistry() {
     let cancelled = false
     const load = async () => {
       try {
-        const res = await fetch('/api/registry')
+        const res = await fetch(`${API_BASE}/registry`)
         if (!res.ok) throw new Error(`Registry returned HTTP ${res.status}`)
         const json = (await res.json()) as RegistryResponse
         if (cancelled) return

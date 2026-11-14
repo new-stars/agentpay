@@ -168,6 +168,8 @@ export const fr: Extra = {
   agentStep2: '2. Choisir. « {name} » est le moins cher.',
   agentStep3: '3. Devis. L’acheteur paie {buyer} USDC : vendeur {seller} + commission {fee} ({pct}).',
   agentStep4: '4. Payer. Non exécuté dans cette démo. Un agent réel signerait l’autorisation x402 pour ce montant et appellerait {call}.',
+  backendOfflineTitle: "Aperçu de l’interface seule",
+  backendOfflineBody: "Cette page n’a pas de serveur de paiement derrière elle : les paiements en direct, la place de marché des vendeurs, le crédit prépayé et les reçus n’y sont donc pas disponibles. Lancez l’application complète (interface et serveur) pour les utiliser.",
   rcTitle: "Paiements reçus",
   rcIntro: "Un paiement est accepté instantanément et l’acheteur est débité tout de suite. Circle règle ensuite de nombreux paiements ensemble sur la chaîne : chacun passe donc de reçu à terminé avant d’arriver sur votre solde Gateway.",
   rcEmpty: "Aucun paiement pour l’instant. Quand un agent paiera l’un de vos points d’accès, il apparaîtra ici.",

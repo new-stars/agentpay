@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { API_BASE } from '../api'
 import { Coins } from 'lucide-react'
 import { useLang } from '../LangContext'
 import { fmt, money } from '../locales'
@@ -23,7 +24,7 @@ export function CreditPool() {
     let timer: ReturnType<typeof setTimeout> | undefined
     const load = async () => {
       try {
-        const res = await fetch('/api/credits')
+        const res = await fetch(`${API_BASE}/credits`)
         if (res.ok && !cancelled) setPool((await res.json()) as Pool)
       } catch {
         // Backend not reachable: the card simply stays hidden.

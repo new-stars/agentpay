@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_BASE } from '../api'
 import { RefreshCw, Store } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import type { PricedListing, ListingStatus } from '../registry'
@@ -36,7 +37,7 @@ export function ListingList({ listings, loading, error, onChanged }: Props) {
     setBusyId(id)
     setNote(null)
     try {
-      const res = await fetch(`/api/registry/${id}/check`, { method: 'POST' })
+      const res = await fetch(`${API_BASE}/registry/${id}/check`, { method: 'POST' })
       if (!res.ok) setNote(await describeError(res, t))
       await onChanged()
     } catch {

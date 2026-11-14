@@ -168,6 +168,8 @@ export const zh: Extra = {
   agentStep2: '2. 选择。“{name}”最便宜。',
   agentStep3: '3. 报价。买家支付 {buyer} USDC：卖家 {seller} + 中介费 {fee}（{pct}）。',
   agentStep4: '4. 付款。本演示不会执行。真实的 Agent 会为这个金额签署 x402 授权，并调用 {call}。',
+  backendOfflineTitle: "仅前端预览",
+  backendOfflineBody: "这个页面背后没有连接付款服务器，所以实时付款、卖家市场、预付额度和收款记录在这里都不可用。请运行完整应用（前端加后端）来使用它们。",
   rcTitle: "已收到的付款",
   rcIntro: "付款会被立即接受，买家随即被扣款。Circle 随后把许多笔付款合并在链上结算，所以每一笔都要从“已收到”走到“已完成”，才会计入你的 Gateway 余额。",
   rcEmpty: "还没有付款。当 Agent 向你的接口付款后，会显示在这里。",

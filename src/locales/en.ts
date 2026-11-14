@@ -102,6 +102,8 @@ export const en: Extra = {
   agentStep2: '2. Select. {name} is the cheapest.',
   agentStep3: '3. Quote. The buyer pays {buyer} USDC: seller {seller} + broker fee {fee} ({pct}).',
   agentStep4: '4. Pay. Not executed in this demo. A live agent would sign the x402 authorisation for this amount and call {call}.',
+  backendOfflineTitle: "Frontend-only preview",
+  backendOfflineBody: "This page has no payment server behind it, so live payments, the seller marketplace, prepaid credit and receipts are unavailable here. Run the full app (frontend and backend) to use them.",
   rcTitle: "Payments received",
   rcIntro: "A payment is accepted instantly and the buyer is charged right away. Circle then settles many payments onchain together, so each one moves from received to completed before it reaches your Gateway balance.",
   rcEmpty: "No payments yet. When an agent pays one of your endpoints, it shows up here.",

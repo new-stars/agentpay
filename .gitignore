@@ -50,3 +50,4 @@ traces.jsonl
 # Platform folders
 .vercel/
 .netlify/
+dist-vercel/

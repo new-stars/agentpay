@@ -52,6 +52,8 @@ Checks: `bun run check` (lint and typecheck).
 | `CREDIT_REFUND_MIN_USDC` | Smallest refund a buyer can ask for. Default 0.01. |
 | `CREDIT_REFUND_RESTOCK` | Set to `off` to keep refunded credit out of the pool. |
 | `REFUND_MAX_FEE`, `REFUND_MIN_GAS_USDC` | Used by `scripts/pay-refunds.ts` on your own machine: fee cap and the gas the payout wallet must hold. |
+| `VITE_API_BASE` | Where the page finds its backend. Default `/api` (same site). Set it to an https URL when the page is hosted as plain static files and the backend runs somewhere else. Public: it ends up in the page. |
+| `ALLOWED_ORIGINS` | Backend only. Comma-separated sites that may write to it from a browser (for example your static site's address). Reads are open. |
 | `CREDIT_POOL_USDC` | Optional. Turns on prepaid API credit and sets the seller's total pool, for example `1000`. Unset means off. Always off on a serverless host. |
 | `CREDIT_MIN_USDC`, `CREDIT_MAX_PURCHASE_USDC` | Optional. Smallest purchase (default 0.01) and largest single purchase (default: the whole pool). |
 | `ADMIN_TOKEN` | Optional, at least 16 characters. Enables `DELETE /registry/<id>` so you can remove an abusive listing. Without it that route does not exist. |
@@ -137,3 +139,7 @@ LIMITS=1 bun run scripts/security-check.ts                                      
 If Circle's settlement service fails three times in a row, the backend pauses real payments for a short, growing time and answers `503` with `Retry-After`. Nothing is charged. Buyers should wait and retry. The cause is written to the server log. See `docs/mainnet-readiness.md` before going to mainnet.
 
 See `docs/scaling.md` for what was measured at volume and how to run this for tens of thousands of payments a day.
+
+## Hosting the page without its backend
+
+Vercel, Netlify and Hugging Face static Spaces only serve files, so the payment server is not there. The page notices (it asks the backend for `/health` once) and shows a short notice instead of failing panels. To give a static page a working backend, run the backend somewhere that keeps a server running, build the page with `VITE_API_BASE=https://your-backend`, and start the backend with `ALLOWED_ORIGINS=https://your-static-site`.

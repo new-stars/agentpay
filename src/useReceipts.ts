@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { API_BASE } from './api'
 import { isTerminal, type ReceiptsResponse } from './receipts'
 
 const FAST_MS = 8_000 // something is still settling: look again soon
@@ -17,7 +18,7 @@ export function useReceipts() {
       let next = SLOW_MS
       if (document.visibilityState === 'visible') {
         try {
-          const res = await fetch('/api/payments')
+          const res = await fetch(`${API_BASE}/payments`)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const json = (await res.json()) as ReceiptsResponse
           if (cancelled) return

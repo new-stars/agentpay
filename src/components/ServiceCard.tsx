@@ -1,4 +1,5 @@
 import { useState, useRef, useContext } from 'react'
+import { API_BASE, checkBackend } from '../api'
 import { m, AnimatePresence } from 'framer-motion'
 import {
   Zap, CheckCircle, XCircle, Loader2, Terminal,
@@ -133,8 +134,15 @@ export function ServiceCard({ service }: { service: AgentService }) {
     addLog({ type: 'info',  text: `   ${t.traceNoCreds}` })
     await sleep(150)
 
+    // A page hosted as static files has no payment server: say so instead of showing a raw 404.
+    if (!(await checkBackend())) {
+      addLog({ type: 'error', text: t.traceBackendDown })
+      setStatus('error')
+      return
+    }
+
     try {
-      const unauth = await fetch(`/api${service.endpoint}`, {
+      const unauth = await fetch(`${API_BASE}${service.endpoint}`, {
         method: service.method,
         headers: { 'Content-Type': 'application/json' },
         ...(service.examplePayload ? { body: JSON.stringify(service.examplePayload) } : {}),
@@ -180,7 +188,7 @@ export function ServiceCard({ service }: { service: AgentService }) {
     await sleep(162)
 
     try {
-      const paid = await fetch(`/api${service.endpoint}`, {
+      const paid = await fetch(`${API_BASE}${service.endpoint}`, {
         method: service.method,
         headers: { 'Content-Type': 'application/json', 'X-Demo-Mode': 'simulate' },
         ...(service.examplePayload ? { body: JSON.stringify(service.examplePayload) } : {}),

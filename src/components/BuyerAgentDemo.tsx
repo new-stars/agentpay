@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_BASE } from '../api'
 import { Bot, Search, Loader2 } from 'lucide-react'
 import type { PricedListing } from '../registry'
 import { useLang, type FullT } from '../LangContext'
@@ -30,7 +31,7 @@ export function BuyerAgentDemo() {
     setOutcome(null)
     try {
       const qs = new URLSearchParams({ category, maxPrice: budget })
-      const res = await fetch(`/api/registry/select?${qs.toString()}`)
+      const res = await fetch(`${API_BASE}/registry/select?${qs.toString()}`)
       if (res.status === 404) setOutcome({ kind: 'none' })
       else if (!res.ok) setOutcome({ kind: 'error', message: await describeError(res, t) })
       else setOutcome({ kind: 'found', data: (await res.json()) as SelectResponse })

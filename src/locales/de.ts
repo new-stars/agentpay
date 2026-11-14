@@ -168,6 +168,8 @@ export const de: Extra = {
   agentStep2: '2. Auswählen. „{name}“ ist der günstigste.',
   agentStep3: '3. Angebot. Der Käufer zahlt {buyer} USDC: Verkäufer {seller} + Vermittlungsgebühr {fee} ({pct}).',
   agentStep4: '4. Bezahlen. In dieser Demo nicht ausgeführt. Ein echter Agent würde die x402-Autorisierung für diesen Betrag signieren und {call} aufrufen.',
+  backendOfflineTitle: "Vorschau nur der Oberfläche",
+  backendOfflineBody: "Hinter dieser Seite steht kein Zahlungsserver, deshalb sind Live-Zahlungen, der Verkäufer-Marktplatz, vorausbezahltes Guthaben und Belege hier nicht verfügbar. Starte die vollständige Anwendung (Oberfläche und Server), um sie zu nutzen.",
   rcTitle: "Eingegangene Zahlungen",
   rcIntro: "Eine Zahlung wird sofort akzeptiert und der Käufer wird gleich belastet. Circle rechnet danach viele Zahlungen gemeinsam auf der Blockchain ab. Jede Zahlung durchläuft daher die Stufen von „Eingegangen“ bis „Abgeschlossen“, bevor sie dein Gateway-Guthaben erreicht.",
   rcEmpty: "Noch keine Zahlungen. Sobald ein Agent einen deiner Endpunkte bezahlt, erscheint die Zahlung hier.",

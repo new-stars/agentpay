@@ -114,6 +114,8 @@ export interface Extra {
   agentStep3: string // {buyer} {seller} {fee} {pct}
   agentStep4: string // {call}
   // ── errors (server error codes + network) ──
+  backendOfflineTitle: string
+  backendOfflineBody: string
   rcTitle: string
   rcIntro: string
   rcEmpty: string

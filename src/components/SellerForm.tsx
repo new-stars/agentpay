@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { API_BASE } from '../api'
 import { Send, Loader2 } from 'lucide-react'
 import { quote, BROKER_FEE_BPS, type PricedListing, type ListingStatus } from '../registry'
 import { useLang } from '../LangContext'
@@ -45,7 +46,7 @@ export function SellerForm({ onSubmitted }: { onSubmitted: () => Promise<void> }
     setError(null)
     setResult(null)
     try {
-      const res = await fetch('/api/registry', {
+      const res = await fetch(`${API_BASE}/registry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

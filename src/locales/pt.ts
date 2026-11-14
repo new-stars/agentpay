@@ -168,6 +168,8 @@ export const pt: Extra = {
   agentStep2: '2. Escolher. "{name}" é o mais barato.',
   agentStep3: '3. Cotar. O comprador paga {buyer} USDC: vendedor {seller} + comissão do intermediário {fee} ({pct}).',
   agentStep4: '4. Pagar. Não é executado nesta demonstração. Um agente real assinaria a autorização x402 por este valor e chamaria {call}.',
+  backendOfflineTitle: "Pré-visualização só da interface",
+  backendOfflineBody: "Esta página não tem um servidor de pagamentos por trás, então pagamentos reais, o mercado de vendedores, o crédito pré-pago e os recibos não estão disponíveis aqui. Execute o aplicativo completo (interface e servidor) para usá-los.",
   rcTitle: "Pagamentos recebidos",
   rcIntro: "Um pagamento é aceito na hora e o comprador é cobrado imediatamente. Depois, a Circle liquida muitos pagamentos juntos na cadeia, então cada um passa de recebido a concluído antes de chegar ao seu saldo do Gateway.",
   rcEmpty: "Ainda não há pagamentos. Quando um agente pagar um dos seus pontos de acesso, ele aparecerá aqui.",

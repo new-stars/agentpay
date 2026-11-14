@@ -8,8 +8,10 @@ import { BuyerAgentDemo } from './BuyerAgentDemo'
 import { DiscoveryPanel } from './DiscoveryPanel'
 import { SellerReceipts } from './SellerReceipts'
 import { CreditPool } from './CreditPool'
+import { BackendNotice } from './BackendNotice'
+import { useBackendStatus } from '../api'
 
-export function MarketplaceSection() {
+function MarketplaceBody() {
   const { t } = useLang()
   const { listings, feeBps, loading, error, refresh } = useRegistry()
 
@@ -47,6 +49,22 @@ export function MarketplaceSection() {
         <DiscoveryPanel />
         <BuyerAgentDemo />
       </div>
+    </section>
+  )
+}
+
+/** Without a payment server behind the page, say so once instead of mounting panels that can only fail. */
+export function MarketplaceSection() {
+  const { t } = useLang()
+  const backend = useBackendStatus()
+  if (backend === 'online') return <MarketplaceBody />
+  return (
+    <section className="mb-12">
+      <div className="mb-5">
+        <h2 className="display text-lg font-semibold text-[var(--ink)]">{t.mkTitle}</h2>
+        <p className="text-xs text-[var(--subtle)] mt-0.5">{t.mkSubtitle}</p>
+      </div>
+      {backend === 'offline' ? <BackendNotice compact /> : <div className="h-24" aria-busy="true" />}
     </section>
   )
 }
